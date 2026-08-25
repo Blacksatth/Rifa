@@ -13,6 +13,7 @@ import { Raffle, RaffleNumber } from "@/lib/types";
 import PrizeCard from "@/components/PrizeCard";
 import NumberGrid from "@/components/NumberGrid";
 import ReservationModal from "@/components/ReservationModal";
+import Link from "next/link";
 
 export default function HomePage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
@@ -61,6 +62,27 @@ export default function HomePage() {
   if (!raffle) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-slate-950 flex items-center justify-center">
+        {/* Botón Admin */}
+        <Link
+          href="/admin"
+          className="fixed top-4 right-4 z-20 flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-slate-400 backdrop-blur-md transition-all hover:border-violet-500/20 hover:bg-violet-500/10 hover:text-violet-300"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
+            />
+          </svg>
+          Admin
+        </Link>
+
         {/* Luces del fondo */}
         <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-purple-600/20 blur-3xl" />
         <div className="absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl" />
@@ -76,6 +98,27 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950">
+      {/* Botón Admin */}
+      <Link
+        href="/admin"
+        className="fixed top-4 right-4 z-20 flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-slate-400 backdrop-blur-md transition-all hover:border-violet-500/20 hover:bg-violet-500/10 hover:text-violet-300"
+      >
+        <svg
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
+          />
+        </svg>
+        Admin
+      </Link>
+
       {/* ========================================= */}
       {/* FONDO DECORATIVO */}
       {/* ========================================= */}

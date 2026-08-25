@@ -15,7 +15,6 @@ import NumbersTable from "@/components/admin/NumbersTable";
 import SearchBar from "@/components/admin/SearchBar";
 import StatsPanel from "@/components/admin/StatsPanel";
 import { useRouter } from "next/navigation";
-
 export default function AdminPage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [numbers, setNumbers] = useState<RaffleNumber[]>([]);
