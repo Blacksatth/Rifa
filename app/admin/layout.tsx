@@ -1,0 +1,168 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { useRouter, usePathname } from "next/navigation";
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    /*
+     * LOGIN NO NECESITA AUTORIZACIÓN
+     */
+
+    if (pathname === "/admin/login") {
+      setChecking(false);
+      setAuthorized(false);
+      return;
+    }
+
+    setChecking(true);
+    setAuthorized(false);
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (user) => {
+        /*
+         * No existe usuario
+         */
+
+        if (!user) {
+          setAuthorized(false);
+          setChecking(false);
+
+          router.replace("/admin/login");
+          return;
+        }
+
+        try {
+          /*
+           * El ID usado aquí es SIEMPRE:
+           *
+           * user.uid
+           *
+           * No uses user.email como ID.
+           */
+
+          const adminRef = doc(
+            db,
+            "admins",
+            user.uid
+          );
+
+          const adminSnap = await getDoc(adminRef);
+
+          if (!adminSnap.exists()) {
+            console.warn(
+              "Usuario autenticado pero no existe en admins:",
+              user.uid
+            );
+
+            setAuthorized(false);
+            setChecking(false);
+
+            router.replace("/admin/login");
+            return;
+          }
+
+          /*
+           * Usuario autorizado
+           */
+
+          setAuthorized(true);
+          setChecking(false);
+
+        } catch (error) {
+          console.error(
+            "Error verificando administrador:",
+            error
+          );
+
+          setAuthorized(false);
+          setChecking(false);
+
+          router.replace("/admin/login");
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [pathname, router]);
+
+  /*
+   * La página de login se muestra siempre.
+   */
+
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
+
+  /*
+   * Pantalla de verificación
+   */
+
+  if (checking) {
+    return (
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060713] px-6 text-white">
+
+        <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-violet-600/20 blur-[100px]" />
+
+        <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-600/15 blur-[100px]" />
+
+        <div className="relative w-full max-w-sm">
+
+          <div className="rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-8 text-center shadow-2xl backdrop-blur-2xl">
+
+            <div className="relative mx-auto mb-6 h-14 w-14">
+
+              <div className="absolute inset-0 rounded-full bg-violet-500/20 blur-xl" />
+
+              <div className="relative h-14 w-14 animate-spin rounded-full border-2 border-white/10 border-t-violet-400" />
+
+            </div>
+
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-violet-400">
+              Seguridad
+            </p>
+
+            <h1 className="mt-2 text-lg font-bold">
+              Verificando acceso
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Comprobando tus permisos de administrador...
+            </p>
+
+          </div>
+
+        </div>
+
+      </main>
+    );
+  }
+
+  /*
+   * Mientras redirecciona, no mostramos contenido privado.
+   */
+
+  if (!authorized) {
+    return null;
+  }
+
+  /*
+   * Usuario autorizado.
+   */
+
+  return <>{children}</>;
+}
