@@ -7,12 +7,22 @@ export interface Raffle {
   price: number;
   digits: number;
   active: boolean;
+
+  drawDate: string;
+  drawTime: string;
+  drawMethod: string;
+  description: string;
+  whatsapp: string;
 }
 
 export interface RaffleNumber {
   id: string;
+
   number: string;
+
   status: "available" | "reserved" | "sold";
+
   buyerName: string | null;
+
   buyerPhone: string | null;
 }

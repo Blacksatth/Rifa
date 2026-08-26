@@ -14,7 +14,6 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-
 import { Raffle } from "@/lib/types";
 
 export default function RaffleForm({
@@ -26,9 +25,7 @@ export default function RaffleForm({
   // ESTADOS
   // ==========================================
 
-  const [name, setName] = useState(
-    existing?.name ?? ""
-  );
+  const [name, setName] = useState(existing?.name ?? "");
 
   const [prizeName, setPrizeName] = useState(
     existing?.prizeName ?? ""
@@ -42,9 +39,27 @@ export default function RaffleForm({
     existing?.price ?? 1
   );
 
-  const [file, setFile] = useState<File | null>(
-    null
+  const [drawDate, setDrawDate] = useState(
+    (existing as any)?.drawDate ?? ""
   );
+
+  const [drawTime, setDrawTime] = useState(
+    (existing as any)?.drawTime ?? ""
+  );
+
+  const [drawMethod, setDrawMethod] = useState(
+    (existing as any)?.drawMethod ?? ""
+  );
+
+  const [description, setDescription] = useState(
+    (existing as any)?.description ?? ""
+  );
+
+  const [whatsapp, setWhatsapp] = useState(
+    (existing as any)?.whatsapp ?? ""
+  );
+
+  const [file, setFile] = useState<File | null>(null);
 
   const [preview, setPreview] = useState(
     existing?.prizeImageUrl ?? ""
@@ -80,16 +95,10 @@ export default function RaffleForm({
     file: File
   ): Promise<string> {
     const cloudName =
-      process.env
-        .NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
     const uploadPreset =
-      process.env
-        .NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-    // ------------------------------------------
-    // VALIDAR VARIABLES
-    // ------------------------------------------
+      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName) {
       throw new Error(
@@ -103,32 +112,11 @@ export default function RaffleForm({
       );
     }
 
-    // ------------------------------------------
-    // FORM DATA
-    // ------------------------------------------
-
     const formData = new FormData();
 
-    formData.append(
-      "file",
-      file
-    );
-
-    formData.append(
-      "upload_preset",
-      uploadPreset
-    );
-
-    // Carpeta donde Cloudinary guardará
-    // las imágenes
-    formData.append(
-      "folder",
-      "rifas"
-    );
-
-    // ------------------------------------------
-    // REQUEST
-    // ------------------------------------------
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+    formData.append("folder", "rifas");
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -138,20 +126,9 @@ export default function RaffleForm({
       }
     );
 
-    // ------------------------------------------
-    // RESPUESTA
-    // ------------------------------------------
-
     const data = await response.json();
 
-    console.log(
-      "Respuesta Cloudinary:",
-      data
-    );
-
-    // ------------------------------------------
-    // ERROR
-    // ------------------------------------------
+    console.log("Respuesta Cloudinary:", data);
 
     if (!response.ok) {
       throw new Error(
@@ -159,10 +136,6 @@ export default function RaffleForm({
           "No se pudo subir la imagen a Cloudinary."
       );
     }
-
-    // ------------------------------------------
-    // VALIDAR URL
-    // ------------------------------------------
 
     if (!data?.secure_url) {
       throw new Error(
@@ -174,19 +147,34 @@ export default function RaffleForm({
   }
 
   // ==========================================
+  // FORMATEAR DINERO
+  // ==========================================
+
+  function formatCOP(value: number) {
+    return Number(value || 0).toLocaleString(
+      "es-CO",
+      {
+        style: "currency",
+        currency: "COP",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }
+    );
+  }
+
+  // ==========================================
   // GUARDAR / EDITAR RIFA
   // ==========================================
 
   async function handleCreate() {
-    // Evitar doble click
     if (loading) return;
 
     setError("");
     setStep("");
 
-    // ==========================================
+    // ========================================
     // VALIDACIONES
-    // ==========================================
+    // ========================================
 
     if (!name.trim()) {
       setError(
@@ -226,9 +214,68 @@ export default function RaffleForm({
       return;
     }
 
-    // ==========================================
+    // ========================================
+    // FECHA DEL SORTEO
+    // ========================================
+
+    if (!drawDate) {
+      setError(
+        "Selecciona la fecha del sorteo."
+      );
+      return;
+    }
+
+    if (!drawTime) {
+      setError(
+        "Selecciona la hora del sorteo."
+      );
+      return;
+    }
+
+    // ========================================
+    // MÉTODO DEL SORTEO
+    // ========================================
+
+    if (!drawMethod.trim()) {
+      setError(
+        "Especifica cómo se realizará el sorteo."
+      );
+      return;
+    }
+
+    // ========================================
+    // DESCRIPCIÓN
+    // ========================================
+
+    if (!description.trim()) {
+      setError(
+        "Escribe una descripción de la rifa."
+      );
+      return;
+    }
+
+    // ========================================
+    // WHATSAPP
+    // ========================================
+
+    if (whatsapp.trim()) {
+      const cleanWhatsapp =
+        whatsapp.replace(/\D/g, "");
+
+      if (
+        cleanWhatsapp.length < 7 ||
+        cleanWhatsapp.length > 15
+      ) {
+        setError(
+          "El número de WhatsApp no parece válido."
+        );
+        return;
+      }
+    }
+
+    // ========================================
     // VALIDAR IMAGEN
-    // ==========================================
+    // ========================================
 
     if (file) {
       const maxSize =
@@ -259,16 +306,16 @@ export default function RaffleForm({
       }
     }
 
-    // ==========================================
+    // ========================================
     // INICIAR
-    // ==========================================
+    // ========================================
 
     setLoading(true);
 
     try {
-      // ========================================
+      // ======================================
       // 1. SUBIR IMAGEN
-      // ========================================
+      // ======================================
 
       let imageUrl =
         existing?.prizeImageUrl ?? "";
@@ -279,135 +326,233 @@ export default function RaffleForm({
         );
 
         imageUrl =
-          await uploadToCloudinary(
-            file
-          );
-
-        console.log(
-          "Imagen subida:",
-          imageUrl
-        );
+          await uploadToCloudinary(file);
       }
 
-      // ========================================
-      // 2. CREAR O ACTUALIZAR RIFA
-      // ========================================
+      // ======================================
+      // 2. CALCULAR DÍGITOS
+      // ======================================
 
       const digits = Math.max(
         2,
         String(total - 1).length
       );
 
+      // ======================================
+      // DATOS DE LA RIFA
+      // ======================================
+
+      const raffleData = {
+        name: name.trim(),
+
+        prizeName:
+          prizeName.trim(),
+
+        prizeImageUrl:
+          imageUrl,
+
+        totalNumbers:
+          total,
+
+        price:
+          Number(price),
+
+        digits,
+
+        drawDate,
+
+        drawTime,
+
+        drawMethod:
+          drawMethod.trim(),
+
+        description:
+          description.trim(),
+
+        whatsapp:
+          whatsapp.trim(),
+
+        updatedAt:
+          serverTimestamp(),
+      };
+
+      // ======================================
+      // 3. EDITAR RIFA
+      // ======================================
+
       if (existing?.id) {
-        // ======================================
-        // EDITAR RIFA EXISTENTE
-        // ======================================
-
-        setStep("Guardando cambios...");
-
-        await updateDoc(
-          doc(db, "raffles", existing.id),
-          {
-            name: name.trim(),
-            prizeName: prizeName.trim(),
-            prizeImageUrl: imageUrl,
-            totalNumbers: total,
-            price: Number(price),
-            digits,
-            updatedAt: serverTimestamp(),
-          }
+        setStep(
+          "Guardando cambios..."
         );
 
-        setStep("¡Rifa actualizada correctamente!");
+        await updateDoc(
+          doc(
+            db,
+            "raffles",
+            existing.id
+          ),
+          raffleData
+        );
+
+        setStep(
+          "¡Rifa actualizada correctamente!"
+        );
 
         alert(
           `✅ Rifa actualizada correctamente.\n\n` +
             `Rifa: ${name}\n` +
-            `Premio: ${prizeName}`
+            `Premio: ${prizeName}\n` +
+            `Sorteo: ${drawDate} ${drawTime}`
         );
 
         return;
       }
 
       // ======================================
-      // CREAR NUEVA RIFA
+      // 4. CREAR NUEVA RIFA
       // ======================================
 
-      setStep("Creando rifa...");
-
-      const raffleRef = await addDoc(
-        collection(db, "raffles"),
-        {
-          name: name.trim(),
-          prizeName: prizeName.trim(),
-          prizeImageUrl: imageUrl,
-          totalNumbers: total,
-          price: Number(price),
-          digits,
-          active: true,
-          createdAt: serverTimestamp(),
-        }
+      setStep(
+        "Creando rifa..."
       );
 
-      console.log("Rifa creada:", raffleRef.id);
+      const raffleRef =
+        await addDoc(
+          collection(
+            db,
+            "raffles"
+          ),
+          {
+            ...raffleData,
 
-      // ========================================
-      // 3. CREAR NÚMEROS
-      // ========================================
+            active: true,
 
-      let batch = writeBatch(db);
-      let batchCount = 0;
-
-      for (let i = 0; i < total; i++) {
-        const numStr = String(i).padStart(digits, "0");
-
-        const numberRef = doc(
-          db,
-          "raffles",
-          raffleRef.id,
-          "numbers",
-          numStr
+            createdAt:
+              serverTimestamp(),
+          }
         );
 
-        batch.set(numberRef, {
-          number: numStr,
-          status: "available",
-          buyerName: null,
-          buyerPhone: null,
-        });
+      console.log(
+        "Rifa creada:",
+        raffleRef.id
+      );
+
+      // ======================================
+      // 5. CREAR NÚMEROS
+      // ======================================
+
+      let batch =
+        writeBatch(db);
+
+      let batchCount = 0;
+
+      for (
+        let i = 0;
+        i < total;
+        i++
+      ) {
+        const numStr =
+          String(i).padStart(
+            digits,
+            "0"
+          );
+
+        const numberRef =
+          doc(
+            db,
+            "raffles",
+            raffleRef.id,
+            "numbers",
+            numStr
+          );
+
+        batch.set(
+          numberRef,
+          {
+            number: numStr,
+
+            status:
+              "available",
+
+            buyerName:
+              null,
+
+            buyerPhone:
+              null,
+          }
+        );
 
         batchCount++;
 
-        if (batchCount === 500) {
-          setStep(`Creando números... ${i + 1} / ${total}`);
+        if (
+          batchCount === 500
+        ) {
+          setStep(
+            `Creando números... ${
+              i + 1
+            } / ${total}`
+          );
 
           await batch.commit();
 
-          batch = writeBatch(db);
+          batch =
+            writeBatch(db);
+
           batchCount = 0;
         }
       }
 
-      if (batchCount > 0) {
-        setStep(`Creando números... ${total} / ${total}`);
+      // ======================================
+      // COMMIT FINAL
+      // ======================================
+
+      if (
+        batchCount > 0
+      ) {
+        setStep(
+          `Creando números... ${total} / ${total}`
+        );
+
         await batch.commit();
       }
 
-      setStep("¡Rifa creada correctamente!");
+      // ======================================
+      // FINALIZAR
+      // ======================================
+
+      setStep(
+        "¡Rifa creada correctamente!"
+      );
 
       alert(
         `🎉 Rifa creada correctamente.\n\n` +
           `Rifa: ${name}\n` +
           `Premio: ${prizeName}\n` +
-          `Números: ${total}`
+          `Números: ${total}\n` +
+          `Precio: ${formatCOP(
+            Number(price)
+          )}\n` +
+          `Sorteo: ${drawDate} ${drawTime}`
       );
+
+      // ======================================
+      // LIMPIAR
+      // ======================================
 
       setName("");
       setPrizeName("");
       setTotal(100);
       setPrice(1);
+
+      setDrawDate("");
+      setDrawTime("");
+      setDrawMethod("");
+      setDescription("");
+      setWhatsapp("");
+
       setFile(null);
       setPreview("");
+
       setStep("");
     } catch (err: any) {
       console.error(
@@ -418,9 +563,7 @@ export default function RaffleForm({
         "ERROR CREANDO RIFA"
       );
 
-      console.error(
-        err
-      );
+      console.error(err);
 
       console.error(
         "Código:",
@@ -439,46 +582,29 @@ export default function RaffleForm({
       let message =
         "No se pudo crear la rifa.";
 
-      // ========================================
-      // ERRORES FIREBASE
-      // ========================================
-
       if (
         err?.code ===
         "permission-denied"
       ) {
         message =
           "Firebase rechazó la operación por permisos. Revisa las reglas de Firestore.";
-      }
-
-      // ========================================
-      // ERRORES CLOUDINARY
-      // ========================================
-
-      else if (
-        err?.message?.toLowerCase().includes(
-          "cloudinary"
-        )
+      } else if (
+        err?.message
+          ?.toLowerCase()
+          .includes(
+            "cloudinary"
+          )
       ) {
         message =
           err.message;
-      }
-
-      // ========================================
-      // ERROR GENÉRICO
-      // ========================================
-
-      else if (
+      } else if (
         err?.message
       ) {
         message =
           err.message;
       }
 
-      setError(
-        message
-      );
-
+      setError(message);
       setStep("");
     } finally {
       setLoading(false);
@@ -490,60 +616,98 @@ export default function RaffleForm({
   // ==========================================
 
   async function handleDelete() {
-    if (!existing?.id || loading) return;
+    if (
+      !existing?.id ||
+      loading
+    )
+      return;
 
-    const confirmed = window.confirm(
-      `¿Seguro que quieres eliminar la rifa "${existing.name}"?\n\n` +
-        "También se eliminarán todos sus números. Esta acción no se puede deshacer."
-    );
+    const confirmed =
+      window.confirm(
+        `¿Seguro que quieres eliminar la rifa "${existing.name}"?\n\n` +
+          "También se eliminarán todos sus números. Esta acción no se puede deshacer."
+      );
 
-    if (!confirmed) return;
+    if (!confirmed)
+      return;
 
     setLoading(true);
     setError("");
-    setStep("Eliminando rifa...");
+    setStep(
+      "Eliminando rifa..."
+    );
 
     try {
-      const numbersRef = collection(
-        db,
-        "raffles",
-        existing.id,
-        "numbers"
-      );
+      const numbersRef =
+        collection(
+          db,
+          "raffles",
+          existing.id,
+          "numbers"
+        );
 
-      const snapshot = await getDocs(numbersRef);
+      const snapshot =
+        await getDocs(
+          numbersRef
+        );
 
-      let batch = writeBatch(db);
+      let batch =
+        writeBatch(db);
+
       let batchCount = 0;
 
-      for (const numberDoc of snapshot.docs) {
-        batch.delete(numberDoc.ref);
+      for (
+        const numberDoc of snapshot.docs
+      ) {
+        batch.delete(
+          numberDoc.ref
+        );
+
         batchCount++;
 
-        if (batchCount === 500) {
+        if (
+          batchCount === 500
+        ) {
           await batch.commit();
-          batch = writeBatch(db);
+
+          batch =
+            writeBatch(db);
+
           batchCount = 0;
         }
       }
 
-      if (batchCount > 0) {
+      if (
+        batchCount > 0
+      ) {
         await batch.commit();
       }
 
       await deleteDoc(
-        doc(db, "raffles", existing.id)
+        doc(
+          db,
+          "raffles",
+          existing.id
+        )
       );
 
-      alert("🗑️ Rifa eliminada correctamente.");
+      alert(
+        "🗑️ Rifa eliminada correctamente."
+      );
+
       setStep("");
     } catch (err: any) {
-      console.error("Error eliminando rifa:", err);
+      console.error(
+        "Error eliminando rifa:",
+        err
+      );
 
       setError(
-        err?.code === "permission-denied"
+        err?.code ===
+          "permission-denied"
           ? "Firebase rechazó la eliminación. Revisa las reglas de Firestore."
-          : err?.message || "No se pudo eliminar la rifa."
+          : err?.message ||
+              "No se pudo eliminar la rifa."
       );
 
       setStep("");
@@ -553,15 +717,21 @@ export default function RaffleForm({
   }
 
   // ==========================================
+  // VALOR TOTAL
+  // ==========================================
+
+  const totalValue =
+    Number(total || 0) *
+    Number(price || 0);
+
+  // ==========================================
   // JSX
   // ==========================================
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
 
-      {/* =====================================
-          GLOW
-      ====================================== */}
+      {/* GLOW */}
 
       <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full bg-violet-600/10 blur-3xl" />
 
@@ -602,7 +772,9 @@ export default function RaffleForm({
               </p>
 
               <h2 className="mt-1 text-xl font-bold text-white">
-                {existing ? "Editar rifa" : "Nueva rifa"}
+                {existing
+                  ? "Editar rifa"
+                  : "Nueva rifa"}
               </h2>
 
               <p className="mt-1 text-sm text-slate-400">
@@ -687,7 +859,6 @@ export default function RaffleForm({
                 fill="none"
                 viewBox="0 0 24 24"
               >
-
                 <circle
                   className="opacity-20"
                   cx="12"
@@ -703,7 +874,6 @@ export default function RaffleForm({
                   strokeWidth="3"
                   strokeLinecap="round"
                 />
-
               </svg>
 
               <p className="text-sm font-medium text-violet-300">
@@ -723,7 +893,7 @@ export default function RaffleForm({
         )}
 
         {/* ===================================
-            GRID
+            GRID PRINCIPAL
         ==================================== */}
 
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -748,27 +918,9 @@ export default function RaffleForm({
                 disabled={loading}
                 placeholder="Ej. Gran Rifa de Verano"
                 onChange={(e) =>
-                  setName(
-                    e.target.value
-                  )
+                  setName(e.target.value)
                 }
-                className="
-                  w-full rounded-xl
-                  border border-slate-700
-                  bg-slate-950
-                  px-4 py-3.5
-                  text-sm text-white
-                  placeholder:text-slate-600
-                  shadow-inner shadow-black/20
-                  outline-none
-                  transition
-                  hover:border-slate-600
-                  focus:border-violet-500
-                  focus:ring-4
-                  focus:ring-violet-500/10
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
-                "
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 shadow-inner shadow-black/20 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
             </div>
@@ -787,36 +939,16 @@ export default function RaffleForm({
                 disabled={loading}
                 placeholder="Ej. iPhone 17 Pro Max"
                 onChange={(e) =>
-                  setPrizeName(
-                    e.target.value
-                  )
+                  setPrizeName(e.target.value)
                 }
-                className="
-                  w-full rounded-xl
-                  border border-slate-700
-                  bg-slate-950
-                  px-4 py-3.5
-                  text-sm text-white
-                  placeholder:text-slate-600
-                  shadow-inner shadow-black/20
-                  outline-none
-                  transition
-                  hover:border-slate-600
-                  focus:border-violet-500
-                  focus:ring-4
-                  focus:ring-violet-500/10
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
-                "
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 shadow-inner shadow-black/20 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
             </div>
 
-            {/* NUMEROS + PRECIO */}
+            {/* NÚMEROS + PRECIO */}
 
             <div className="grid gap-4 sm:grid-cols-2">
-
-              {/* NUMEROS */}
 
               <div>
 
@@ -832,25 +964,10 @@ export default function RaffleForm({
                   disabled={loading}
                   onChange={(e) =>
                     setTotal(
-                      Number(
-                        e.target.value
-                      )
+                      Number(e.target.value)
                     )
                   }
-                  className="
-                    w-full rounded-xl
-                    border border-slate-700
-                    bg-slate-950
-                    px-4 py-3.5
-                    text-sm text-white
-                    outline-none
-                    transition
-                    hover:border-slate-600
-                    focus:border-violet-500
-                    focus:ring-4
-                    focus:ring-violet-500/10
-                    disabled:opacity-60
-                  "
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
                 />
 
                 <p className="mt-2 text-xs text-slate-500">
@@ -858,8 +975,6 @@ export default function RaffleForm({
                 </p>
 
               </div>
-
-              {/* PRECIO */}
 
               <div>
 
@@ -881,25 +996,10 @@ export default function RaffleForm({
                     disabled={loading}
                     onChange={(e) =>
                       setPrice(
-                        Number(
-                          e.target.value
-                        )
+                        Number(e.target.value)
                       )
                     }
-                    className="
-                      w-full rounded-xl
-                      border border-slate-700
-                      bg-slate-950
-                      py-3.5 pl-9 pr-4
-                      text-sm text-white
-                      outline-none
-                      transition
-                      hover:border-slate-600
-                      focus:border-violet-500
-                      focus:ring-4
-                      focus:ring-violet-500/10
-                      disabled:opacity-60
-                    "
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3.5 pl-9 pr-4 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
                   />
 
                 </div>
@@ -909,6 +1009,160 @@ export default function RaffleForm({
                 </p>
 
               </div>
+
+            </div>
+
+            {/* =================================
+                SORTEO
+            ================================== */}
+
+            <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5">
+
+              <div className="mb-5">
+
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-400">
+                  Fecha del sorteo
+                </p>
+
+                <p className="mt-1 text-sm text-slate-400">
+                  Indica cuándo y cómo se elegirá el número ganador.
+                </p>
+
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+
+                {/* FECHA */}
+
+                <div>
+
+                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+                    📅 Fecha
+                  </label>
+
+                  <input
+                    type="date"
+                    value={drawDate}
+                    disabled={loading}
+                    onChange={(e) =>
+                      setDrawDate(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+                  />
+
+                </div>
+
+                {/* HORA */}
+
+                <div>
+
+                  <label className="mb-2 block text-sm font-semibold text-slate-300">
+                    🕐 Hora
+                  </label>
+
+                  <input
+                    type="time"
+                    value={drawTime}
+                    disabled={loading}
+                    onChange={(e) =>
+                      setDrawTime(
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+                  />
+
+                </div>
+
+              </div>
+
+              {/* MÉTODO */}
+
+              <div className="mt-4">
+
+                <label className="mb-2 block text-sm font-semibold text-slate-300">
+                  🎰 Método del sorteo
+                </label>
+
+                <input
+                  type="text"
+                  value={drawMethod}
+                  disabled={loading}
+                  placeholder="Ej. Lotería de Medellín"
+                  onChange={(e) =>
+                    setDrawMethod(
+                      e.target.value
+                    )
+                  }
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+                />
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Ej. Lotería de Medellín, Lotería de Bogotá, sorteo propio, etc.
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* =================================
+                DESCRIPCIÓN
+            ================================== */}
+
+            <div>
+
+              <label className="mb-2 block text-sm font-semibold text-slate-300">
+                Descripción de la rifa
+              </label>
+
+              <textarea
+                value={description}
+                disabled={loading}
+                rows={4}
+                maxLength={500}
+                placeholder="Describe la rifa, las condiciones y cómo se elegirá al ganador..."
+                onChange={(e) =>
+                  setDescription(
+                    e.target.value
+                  )
+                }
+                className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm leading-6 text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+              />
+
+              <p className="mt-2 text-right text-xs text-slate-500">
+                {description.length}/500
+              </p>
+
+            </div>
+
+            {/* =================================
+                WHATSAPP
+            ================================== */}
+
+            <div>
+
+              <label className="mb-2 block text-sm font-semibold text-slate-300">
+                📱 WhatsApp de contacto
+              </label>
+
+              <input
+                type="tel"
+                value={whatsapp}
+                disabled={loading}
+                placeholder="Ej. 3001234567"
+                onChange={(e) =>
+                  setWhatsapp(
+                    e.target.value
+                  )
+                }
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+              />
+
+              <p className="mt-2 text-xs text-slate-500">
+                Este número podrá mostrarse como contacto para los participantes.
+              </p>
 
             </div>
 
@@ -924,18 +1178,7 @@ export default function RaffleForm({
 
               <label
                 htmlFor="prize-image"
-                className="
-                  group flex cursor-pointer
-                  items-center gap-4
-                  rounded-2xl
-                  border border-dashed
-                  border-slate-700
-                  bg-slate-950
-                  p-5
-                  transition
-                  hover:border-violet-500/60
-                  hover:bg-violet-500/5
-                "
+                className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-5 transition hover:border-violet-500/60 hover:bg-violet-500/5"
               >
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
@@ -946,14 +1189,12 @@ export default function RaffleForm({
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="2"
                       d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
-
                   </svg>
 
                 </div>
@@ -990,6 +1231,42 @@ export default function RaffleForm({
             </div>
 
             {/* =================================
+                VALOR TOTAL
+            ================================== */}
+
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+
+              <div className="flex items-center justify-between gap-4">
+
+                <div>
+
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    Valor total
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    {total.toLocaleString(
+                      "es-CO"
+                    )}{" "}
+                    números ×{" "}
+                    {formatCOP(
+                      Number(price)
+                    )}
+                  </p>
+
+                </div>
+
+                <p className="text-xl font-bold text-emerald-400 sm:text-2xl">
+                  {formatCOP(
+                    totalValue
+                  )}
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* =================================
                 BOTÓN
             ================================== */}
 
@@ -997,23 +1274,7 @@ export default function RaffleForm({
               type="button"
               disabled={loading}
               onClick={handleCreate}
-              className="
-                group relative w-full
-                overflow-hidden rounded-xl
-                bg-gradient-to-r
-                from-violet-600
-                via-indigo-600
-                to-blue-600
-                px-6 py-4
-                font-semibold text-white
-                shadow-xl shadow-violet-600/20
-                transition-all duration-300
-                hover:-translate-y-0.5
-                hover:shadow-violet-600/40
-                active:translate-y-0
-                disabled:cursor-not-allowed
-                disabled:opacity-60
-              "
+              className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-6 py-4 font-semibold text-white shadow-xl shadow-violet-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-violet-600/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
             >
 
               <span className="relative flex items-center justify-center gap-2">
@@ -1046,11 +1307,12 @@ export default function RaffleForm({
 
                     {step ||
                       "Procesando..."}
-
                   </>
                 ) : (
                   <>
-                    {existing ? "Guardar cambios" : "Crear nueva rifa"}
+                    {existing
+                      ? "Guardar cambios"
+                      : "Crear nueva rifa"}
 
                     <svg
                       className="h-5 w-5 transition-transform group-hover:translate-x-1"
@@ -1075,24 +1337,16 @@ export default function RaffleForm({
 
             </button>
 
+            {/* =================================
+                ELIMINAR
+            ================================== */}
+
             {existing && (
               <button
                 type="button"
                 disabled={loading}
                 onClick={handleDelete}
-                className="
-                  mt-3 w-full rounded-xl
-                  border border-red-500/20
-                  bg-red-500/10
-                  px-6 py-3.5
-                  font-semibold text-red-400
-                  transition-all duration-300
-                  hover:border-red-500/40
-                  hover:bg-red-500/15
-                  hover:text-red-300
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                className="mt-3 w-full rounded-xl border border-red-500/20 bg-red-500/10 px-6 py-3.5 font-semibold text-red-400 transition-all duration-300 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 🗑️ Eliminar rifa
               </button>
@@ -1139,14 +1393,12 @@ export default function RaffleForm({
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth="2"
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
-
                         </svg>
 
                       </div>
@@ -1176,6 +1428,78 @@ export default function RaffleForm({
 
                 </div>
 
+                {/* SORTEO */}
+
+                <div className="mt-5 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400">
+                    🎰 Sorteo
+                  </p>
+
+                  <div className="mt-3 space-y-2">
+
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+
+                      <span>📅</span>
+
+                      <span>
+                        {drawDate
+                          ? new Date(
+                              `${drawDate}T12:00:00`
+                            ).toLocaleDateString(
+                              "es-CO",
+                              {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              }
+                            )
+                          : "Fecha del sorteo"}
+                      </span>
+
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+
+                      <span>🕐</span>
+
+                      <span>
+                        {drawTime ||
+                          "Hora del sorteo"}
+                      </span>
+
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+
+                      <span>🎟️</span>
+
+                      <span className="truncate">
+                        {drawMethod ||
+                          "Método del sorteo"}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* DESCRIPCIÓN */}
+
+                <div className="mt-4">
+
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Descripción
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    {description ||
+                      "Aquí aparecerá la descripción de la rifa."}
+                  </p>
+
+                </div>
+
                 {/* ESTADÍSTICAS */}
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
@@ -1187,7 +1511,9 @@ export default function RaffleForm({
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-white">
-                      {total}
+                      {total.toLocaleString(
+                        "es-CO"
+                      )}
                     </p>
 
                   </div>
@@ -1195,22 +1521,52 @@ export default function RaffleForm({
                   <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
 
                     <p className="text-xs text-slate-500">
-                      Precio por boleta
+                      Precio
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-emerald-400">
-                      {Number(
-                        price
-                      ).toLocaleString("es-CO", {
-                        style: "currency",
-                        currency: "COP",
-                        minimumFractionDigits: 0,
-                      })}
+                      {formatCOP(
+                        Number(price)
+                      )}
                     </p>
 
                   </div>
 
                 </div>
+
+                {/* TOTAL */}
+
+                <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+
+                  <div className="flex items-center justify-between">
+
+                    <span className="text-xs font-medium text-slate-500">
+                      Valor total
+                    </span>
+
+                    <span className="font-bold text-amber-300">
+                      {formatCOP(
+                        totalValue
+                      )}
+                    </span>
+
+                  </div>
+
+                </div>
+
+                {/* WHATSAPP */}
+
+                {whatsapp && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+
+                    <span>📱</span>
+
+                    <span className="text-sm text-emerald-400">
+                      {whatsapp}
+                    </span>
+
+                  </div>
+                )}
 
               </div>
 
