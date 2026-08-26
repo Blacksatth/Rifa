@@ -36,11 +36,11 @@ export default function StatsPanel({
   const availablePercentage =
     total > 0 ? Math.round((available / total) * 100) : 0;
 
-  const currency = new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  });
+const currency = new Intl.NumberFormat("es-CO", {
+  style: "currency",
+  currency: "COP",
+  minimumFractionDigits: 0,
+});
 
   return (
     <section className="space-y-4">

@@ -17,26 +17,42 @@ export default function PrizeCard({ raffle }: { raffle: Raffle }) {
       className={`${display.variable} group relative mb-8 overflow-hidden rounded-3xl border border-white/10 bg-[#12141c] shadow-2xl shadow-black/40 transition-transform duration-300 hover:-translate-y-1`}
     >
       {/* ================= PRIZE IMAGE ================= */}
-      <div className="relative h-72 w-full overflow-hidden sm:h-80">
-        {raffle.prizeImageUrl ? (
-          <img
-            src={raffle.prizeImageUrl}
-            alt={raffle.prizeName ? `Premio: ${raffle.prizeName}` : "Premio de la rifa"}
-className="h-full w-full object-cover object-[30%_63%] transition-transform duration-200 group-hover:scale-100"          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-violet-600/40 to-blue-600/40">
-            <TicketIcon className="h-12 w-12 text-white/70" />
-            <span className="text-sm font-medium text-white/60">Sin imagen del premio</span>
-          </div>
-        )}
+      <div className="relative h-72 w-full overflow-hidden bg-black sm:h-80 lg:h-[420px] xl:h-[480px]">
+  {raffle.prizeImageUrl ? (
+    <img
+      src={raffle.prizeImageUrl}
+      alt={
+        raffle.prizeName
+          ? `Premio: ${raffle.prizeName}`
+          : "Premio de la rifa"
+      }
+      className="
+        h-full
+        w-full
+        object-cover
+        object-[30%_63%]
+        lg:object-center
+        transition-transform
+        duration-200
+      "
+    />
+  ) : (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-violet-600/40 to-blue-600/40">
+      <TicketIcon className="h-12 w-12 text-white/70" />
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/10" />
+      <span className="text-sm font-medium text-white/60">
+        Sin imagen del premio
+      </span>
+    </div>
+  )}
 
-        <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-          <TicketIcon className="h-4 w-4" />
-          Premio oficial
-        </span>
-      </div>
+  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/10" />
+
+  <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+    <TicketIcon className="h-4 w-4" />
+    Premio oficial
+  </span>
+</div>
 
       {/* ================= PERFORATION ================= */}
       <div

@@ -1195,14 +1195,17 @@ export default function RaffleForm({
                   <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
 
                     <p className="text-xs text-slate-500">
-                      Precio
+                      Precio por boleta
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-emerald-400">
-                      $
                       {Number(
                         price
-                      ).toFixed(2)}
+                      ).toLocaleString("es-CO", {
+                        style: "currency",
+                        currency: "COP",
+                        minimumFractionDigits: 0,
+                      })}
                     </p>
 
                   </div>
