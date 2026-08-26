@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import Header from "@/components/Header";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -64,7 +65,7 @@ export default function LoginPage() {
           backgroundSize: "40px 40px",
         }}
       />
-
+ <Header  raffle />
       {/* Card */}
       <div className="relative w-full max-w-md">
 
