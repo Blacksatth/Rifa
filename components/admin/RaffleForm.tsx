@@ -8,6 +8,9 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
+  updateDoc,
+  deleteDoc,
+  getDocs,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -171,7 +174,7 @@ export default function RaffleForm({
   }
 
   // ==========================================
-  // CREAR RIFA
+  // GUARDAR / EDITAR RIFA
   // ==========================================
 
   async function handleCreate() {
@@ -287,158 +290,110 @@ export default function RaffleForm({
       }
 
       // ========================================
-      // 2. CREAR RIFA EN FIRESTORE
+      // 2. CREAR O ACTUALIZAR RIFA
       // ========================================
-
-      setStep(
-        "Creando rifa..."
-      );
-
-      // Ejemplo:
-      //
-      // 100 números
-      // 0 - 99
-      // digits = 2
-      //
-      // 1000 números
-      // 0 - 999
-      // digits = 3
 
       const digits = Math.max(
         2,
         String(total - 1).length
       );
 
-      const raffleRef =
-        await addDoc(
-          collection(
-            db,
-            "raffles"
-          ),
+      if (existing?.id) {
+        // ======================================
+        // EDITAR RIFA EXISTENTE
+        // ======================================
+
+        setStep("Guardando cambios...");
+
+        await updateDoc(
+          doc(db, "raffles", existing.id),
           {
-            name:
-              name.trim(),
-
-            prizeName:
-              prizeName.trim(),
-
-            // URL DE CLOUDINARY
-            prizeImageUrl:
-              imageUrl,
-
-            totalNumbers:
-              total,
-
-            price:
-
-              Number(price),
-
+            name: name.trim(),
+            prizeName: prizeName.trim(),
+            prizeImageUrl: imageUrl,
+            totalNumbers: total,
+            price: Number(price),
             digits,
-
-            active:
-              true,
-
-            createdAt:
-              serverTimestamp(),
+            updatedAt: serverTimestamp(),
           }
         );
 
-      console.log(
-        "Rifa creada:",
-        raffleRef.id
+        setStep("¡Rifa actualizada correctamente!");
+
+        alert(
+          `✅ Rifa actualizada correctamente.\n\n` +
+            `Rifa: ${name}\n` +
+            `Premio: ${prizeName}`
+        );
+
+        return;
+      }
+
+      // ======================================
+      // CREAR NUEVA RIFA
+      // ======================================
+
+      setStep("Creando rifa...");
+
+      const raffleRef = await addDoc(
+        collection(db, "raffles"),
+        {
+          name: name.trim(),
+          prizeName: prizeName.trim(),
+          prizeImageUrl: imageUrl,
+          totalNumbers: total,
+          price: Number(price),
+          digits,
+          active: true,
+          createdAt: serverTimestamp(),
+        }
       );
+
+      console.log("Rifa creada:", raffleRef.id);
 
       // ========================================
       // 3. CREAR NÚMEROS
       // ========================================
 
-      let batch =
-        writeBatch(db);
-
+      let batch = writeBatch(db);
       let batchCount = 0;
 
-      for (
-        let i = 0;
-        i < total;
-        i++
-      ) {
-        const numStr =
-          String(i).padStart(
-            digits,
-            "0"
-          );
+      for (let i = 0; i < total; i++) {
+        const numStr = String(i).padStart(digits, "0");
 
-        const numberRef =
-          doc(
-            db,
-            "raffles",
-            raffleRef.id,
-            "numbers",
-            numStr
-          );
-
-        batch.set(
-          numberRef,
-          {
-            number:
-              numStr,
-
-            status:
-              "available",
-
-            buyerName:
-              null,
-
-            buyerPhone:
-              null,
-          }
+        const numberRef = doc(
+          db,
+          "raffles",
+          raffleRef.id,
+          "numbers",
+          numStr
         );
+
+        batch.set(numberRef, {
+          number: numStr,
+          status: "available",
+          buyerName: null,
+          buyerPhone: null,
+        });
 
         batchCount++;
 
-        // ======================================
-        // FIRESTORE MAX 500 OPERACIONES
-        // ======================================
-
-        if (
-          batchCount === 500
-        ) {
-          setStep(
-            `Creando números... ${
-              i + 1
-            } / ${total}`
-          );
+        if (batchCount === 500) {
+          setStep(`Creando números... ${i + 1} / ${total}`);
 
           await batch.commit();
 
-          batch =
-            writeBatch(db);
-
+          batch = writeBatch(db);
           batchCount = 0;
         }
       }
 
-      // ========================================
-      // ÚLTIMO LOTE
-      // ========================================
-
-      if (
-        batchCount > 0
-      ) {
-        setStep(
-          `Creando números... ${total} / ${total}`
-        );
-
+      if (batchCount > 0) {
+        setStep(`Creando números... ${total} / ${total}`);
         await batch.commit();
       }
 
-      // ========================================
-      // FINALIZADO
-      // ========================================
-
-      setStep(
-        "¡Rifa creada correctamente!"
-      );
+      setStep("¡Rifa creada correctamente!");
 
       alert(
         `🎉 Rifa creada correctamente.\n\n` +
@@ -447,22 +402,12 @@ export default function RaffleForm({
           `Números: ${total}`
       );
 
-      // ========================================
-      // LIMPIAR FORMULARIO
-      // ========================================
-
       setName("");
-
       setPrizeName("");
-
       setTotal(100);
-
       setPrice(1);
-
       setFile(null);
-
       setPreview("");
-
       setStep("");
     } catch (err: any) {
       console.error(
@@ -541,6 +486,73 @@ export default function RaffleForm({
   }
 
   // ==========================================
+  // ELIMINAR RIFA
+  // ==========================================
+
+  async function handleDelete() {
+    if (!existing?.id || loading) return;
+
+    const confirmed = window.confirm(
+      `¿Seguro que quieres eliminar la rifa "${existing.name}"?\n\n` +
+        "También se eliminarán todos sus números. Esta acción no se puede deshacer."
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError("");
+    setStep("Eliminando rifa...");
+
+    try {
+      const numbersRef = collection(
+        db,
+        "raffles",
+        existing.id,
+        "numbers"
+      );
+
+      const snapshot = await getDocs(numbersRef);
+
+      let batch = writeBatch(db);
+      let batchCount = 0;
+
+      for (const numberDoc of snapshot.docs) {
+        batch.delete(numberDoc.ref);
+        batchCount++;
+
+        if (batchCount === 500) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+
+      await deleteDoc(
+        doc(db, "raffles", existing.id)
+      );
+
+      alert("🗑️ Rifa eliminada correctamente.");
+      setStep("");
+    } catch (err: any) {
+      console.error("Error eliminando rifa:", err);
+
+      setError(
+        err?.code === "permission-denied"
+          ? "Firebase rechazó la eliminación. Revisa las reglas de Firestore."
+          : err?.message || "No se pudo eliminar la rifa."
+      );
+
+      setStep("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ==========================================
   // JSX
   // ==========================================
 
@@ -590,11 +602,13 @@ export default function RaffleForm({
               </p>
 
               <h2 className="mt-1 text-xl font-bold text-white">
-                Nueva rifa
+                {existing ? "Editar rifa" : "Nueva rifa"}
               </h2>
 
               <p className="mt-1 text-sm text-slate-400">
-                Configura los detalles de tu próxima rifa.
+                {existing
+                  ? "Modifica los datos de esta rifa."
+                  : "Configura los detalles de tu próxima rifa."}
               </p>
 
             </div>
@@ -1036,7 +1050,7 @@ export default function RaffleForm({
                   </>
                 ) : (
                   <>
-                    Crear nueva rifa
+                    {existing ? "Guardar cambios" : "Crear nueva rifa"}
 
                     <svg
                       className="h-5 w-5 transition-transform group-hover:translate-x-1"
@@ -1060,6 +1074,29 @@ export default function RaffleForm({
               </span>
 
             </button>
+
+            {existing && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleDelete}
+                className="
+                  mt-3 w-full rounded-xl
+                  border border-red-500/20
+                  bg-red-500/10
+                  px-6 py-3.5
+                  font-semibold text-red-400
+                  transition-all duration-300
+                  hover:border-red-500/40
+                  hover:bg-red-500/15
+                  hover:text-red-300
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                🗑️ Eliminar rifa
+              </button>
+            )}
 
           </div>
 

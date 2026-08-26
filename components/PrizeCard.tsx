@@ -10,31 +10,30 @@ const display = Space_Grotesk({
 });
 
 export default function PrizeCard({ raffle }: { raffle: Raffle }) {
-  const formattedPrice = formatPrice(raffle.price);
+  const formattedPrice = formatPriceCOP(raffle.price);
 
   return (
     <article
-      className={`${display.variable} group relative mb-6 overflow-hidden rounded-3xl border border-white/10 bg-[#12141c] shadow-xl shadow-black/30 transition-transform duration-300 hover:-translate-y-0.5`}
+      className={`${display.variable} group relative mb-8 overflow-hidden rounded-3xl border border-white/10 bg-[#12141c] shadow-2xl shadow-black/40 transition-transform duration-300 hover:-translate-y-1`}
     >
       {/* ================= PRIZE IMAGE ================= */}
-      <div className="relative h-56 w-full overflow-hidden">
+      <div className="relative h-72 w-full overflow-hidden sm:h-80">
         {raffle.prizeImageUrl ? (
           <img
             src={raffle.prizeImageUrl}
             alt={raffle.prizeName ? `Premio: ${raffle.prizeName}` : "Premio de la rifa"}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+className="h-full w-full object-cover object-[30%_63%] transition-transform duration-200 group-hover:scale-100"          />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-violet-600/40 to-blue-600/40">
-            <TicketIcon className="h-9 w-9 text-white/70" />
-            <span className="text-xs font-medium text-white/60">Sin imagen del premio</span>
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-violet-600/40 to-blue-600/40">
+            <TicketIcon className="h-12 w-12 text-white/70" />
+            <span className="text-sm font-medium text-white/60">Sin imagen del premio</span>
           </div>
         )}
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/10" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/10" />
 
-        <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-          <TicketIcon className="h-3.5 w-3.5" />
+        <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+          <TicketIcon className="h-4 w-4" />
           Premio oficial
         </span>
       </div>
@@ -44,38 +43,38 @@ export default function PrizeCard({ raffle }: { raffle: Raffle }) {
         className="relative h-0 w-full"
         style={{
           backgroundImage:
-            "repeating-linear-gradient(to right, rgba(255,255,255,0.18) 0 6px, transparent 6px 12px)",
+            "repeating-linear-gradient(to right, rgba(230, 212, 212, 0.18) 0 6px, transparent 6px 12px)",
           height: "1px",
         }}
         aria-hidden="true"
       />
 
       {/* ================= STUB ================= */}
-      <div className="relative px-5 pb-5 pt-6 sm:px-6">
+      <div className="relative px-6 pb-7 pt-8 sm:px-8">
         {/* price stamp */}
-        <div className="absolute -top-5 right-5 -rotate-6 rounded-xl border border-dashed border-amber-400/40 bg-[#12141c] px-3 py-1.5 shadow-lg shadow-black/30 sm:right-6">
+        <div className="absolute -top-7 right-6 -rotate-6 rounded-2xl border border-dashed border-amber-400/40 bg-[#12141c] px-4 py-2 shadow-xl shadow-black/40 sm:right-8">
           <p
             style={{ fontFamily: "var(--font-ticket)" }}
-            className="text-sm font-bold leading-none tracking-tight text-amber-300"
+            className="text-xl font-bold leading-none tracking-tight text-amber-300 sm:text-2xl"
           >
             {formattedPrice}
           </p>
-          <p className="mt-0.5 text-center text-[8px] font-semibold uppercase tracking-wider text-amber-400/70">
-            por número
+          <p className="mt-1 text-center text-[9px] font-semibold uppercase tracking-wider text-amber-400/70">
+            por número · COP
           </p>
         </div>
 
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400">Rifa</p>
+        <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-400">Rifa</p>
 
         <h1
           style={{ fontFamily: "var(--font-ticket)" }}
-          className="mt-1 text-2xl font-bold leading-tight tracking-tight text-white"
+          className="mt-2 text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl"
         >
           {raffle.name}
         </h1>
 
-        <div className="mt-3 flex items-start gap-2.5 text-sm text-slate-400">
-          <GiftIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        <div className="mt-4 flex items-start gap-3 text-base text-slate-400">
+          <GiftIcon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
           <p>
             Premio: <span className="font-medium text-slate-200">{raffle.prizeName}</span>
           </p>
@@ -85,11 +84,26 @@ export default function PrizeCard({ raffle }: { raffle: Raffle }) {
   );
 }
 
-function formatPrice(price: Raffle["price"]) {
+/**
+ * Formatea un valor como pesos colombianos: separador de miles con punto,
+ * sin decimales, con símbolo de $. Ejemplo: 10000 -> "$10.000"
+ */
+function formatPriceCOP(price: Raffle["price"]) {
   const value = typeof price === "string" ? Number(price) : price;
+
   if (typeof value === "number" && !Number.isNaN(value)) {
-    return `$${value.toLocaleString("es-CO")}`;
+    const rounded = Math.round(value);
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+      .format(rounded)
+      .replace("COP", "")
+      .trim();
   }
+
   return `$${price}`;
 }
 
