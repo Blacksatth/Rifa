@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
+import { createPortal } from "react-dom";
 import { db } from "@/lib/firebase";
 import { RaffleNumber } from "@/lib/types";
 import { Space_Grotesk } from "next/font/google";
@@ -533,33 +534,33 @@ export default function NumbersTable({ raffleId, numbers }: Props) {
         />
       )}
 
-      {modal?.type === "edit" && (
-        <EditBuyerModal
-          number={modal.number}
-          processing={
-            processingId === modal.number.id
-          }
-          onCancel={() =>
-            setModal(null)
-          }
-          onSave={(name, phone) =>
-            saveBuyer(
-              modal.number,
-              name,
-              phone
-            )
-          }
-        />
-      )}
+         {typeof document !== "undefined" &&
+        createPortal(
+          <>
+            {modal?.type === "release" && (
+              <ReleaseModal
+                number={modal.number}
+                processing={processingId === modal.number.id}
+                onCancel={() => setModal(null)}
+                onConfirm={() => confirmRelease(modal.number)}
+              />
+            )}
 
-      {/* ====================================================== */}
-      {/* TOASTS */}
-      {/* ====================================================== */}
+            {modal?.type === "edit" && (
+              <EditBuyerModal
+                number={modal.number}
+                processing={processingId === modal.number.id}
+                onCancel={() => setModal(null)}
+                onSave={(name, phone) =>
+                  saveBuyer(modal.number, name, phone)
+                }
+              />
+            )}
 
-      <ToastStack
-        toasts={toasts}
-        onDismiss={dismissToast}
-      />
+            <ToastStack toasts={toasts} onDismiss={dismissToast} />
+          </>,
+          document.body
+        )}
     </div>
   );
 }
@@ -1154,14 +1155,28 @@ function ToastStack({
   onDismiss: (id: number) => void;
 }) {
   return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-3 z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:items-end md:right-6">
+    <div
+      className="
+        pointer-events-none fixed
+        inset-x-3
+        top-[max(1rem,env(safe-area-inset-top))]
+        z-[100]
+        flex flex-col
+        items-center
+        gap-2
+        sm:inset-x-auto
+        sm:right-5
+        sm:top-auto
+        sm:bottom-5
+        sm:items-end
+        md:right-6
+      "
+    >
       {toasts.map((t) => (
         <Toast
           key={t.id}
           toast={t}
-          onDismiss={() =>
-            onDismiss(t.id)
-          }
+          onDismiss={() => onDismiss(t.id)}
         />
       ))}
     </div>

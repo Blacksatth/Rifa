@@ -12,6 +12,7 @@ import { db, auth } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
 import RaffleForm from "@/components/admin/RaffleForm";
 import NumbersTable from "@/components/admin/NumbersTable";
+import Header from "@/components/Header";
 import SearchBar from "@/components/admin/SearchBar";
 import StatsPanel from "@/components/admin/StatsPanel";
 import { useRouter } from "next/navigation";
@@ -122,96 +123,11 @@ export default function AdminPage() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* HEADER */}
-        <header className="mb-8">
+      
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <Header  raffle />
 
-            <div className="flex items-center gap-4">
-
-              {/* Logo */}
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
-
-                <svg
-                  className="w-7 h-7 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
-                  />
-                </svg>
-
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-
-                  <span className="text-xs font-bold tracking-widest text-violet-400">
-                    ADMINISTRACIÓN
-                  </span>
-
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-semibold text-emerald-400">
-                    ADMIN
-                  </span>
-
-                </div>
-
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">
-                  Panel de administración
-                </h1>
-
-                <p className="text-sm text-slate-500 mt-1">
-                  Gestiona tu rifa y controla los números vendidos.
-                </p>
-              </div>
-
-            </div>
-
-            {/* Usuario / logout */}
-            <div className="flex items-center gap-3">
-
-              <div className="hidden sm:block text-right">
-                <p className="text-xs text-slate-500">
-                  Sesión iniciada como
-                </p>
-
-                <p className="text-sm text-slate-300 font-medium">
-                  {auth.currentUser?.email}
-                </p>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-red-500/10 hover:border-red-500/20 transition-all"
-              >
-                <svg
-                  className="w-4 h-4 text-slate-400 group-hover:text-red-400 transition-colors"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-
-                <span className="text-sm text-slate-300 group-hover:text-red-400">
-                  Salir
-                </span>
-              </button>
-
-            </div>
-
-          </div>
-
-        </header>
+      
 
         {/* CONTENIDO */}
         {loading ? (
