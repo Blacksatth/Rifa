@@ -756,14 +756,14 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       "
                     >
                       <img
-                        src="/images/qr-breb1.png"
-                        alt="Código QR para realizar el pago mediante Bre-B"
-                        className="
+  src="/images/qr-breb1.png"
+  alt="Código QR para realizar el pago mediante Bre-B"
+  className="
     h-72 w-72
     object-contain
     sm:h-80 sm:w-80
   "
-                      />
+/>
                     </div>
                   </div>
 
