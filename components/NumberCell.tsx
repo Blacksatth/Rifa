@@ -1,8 +1,9 @@
-
 "use client";
 
 import { RaffleNumber } from "@/lib/types";
-import { isMine } from "@/lib/reservations";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { useEffect, useState } from "react";
 
 type NumberStatus =
   | "available"
@@ -66,6 +67,29 @@ export default function NumberCell({
   onClick,
 }: NumberCellProps) {
   // ============================================================
+  // USUARIO ACTUAL DE FIREBASE
+  // ============================================================
+
+  const [currentUserUid, setCurrentUserUid] = useState<
+    string | null
+  >(auth.currentUser?.uid ?? null);
+
+  // ============================================================
+  // ESCUCHAR SESIÓN DE FIREBASE
+  // ============================================================
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        setCurrentUserUid(user?.uid ?? null);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ============================================================
   // ESTADO DEL NÚMERO
   // ============================================================
 
@@ -78,10 +102,25 @@ export default function NumberCell({
 
   // ============================================================
   // ¿ESTE NÚMERO ES MÍO?
+  //
+  // IMPORTANTE:
+  //
+  // Ya NO usamos localStorage.
+  //
+  // Firestore:
+  // buyerUid = UID del usuario que hizo la reserva
+  //
+  // Firebase Auth:
+  // currentUserUid = UID del usuario actualmente conectado
+  //
+  // Si coinciden => la reserva es del usuario.
   // ============================================================
 
   const mine =
-    status === "reserved" && isMine(data.id);
+    status === "reserved" &&
+    !!currentUserUid &&
+    !!data.buyerUid &&
+    data.buyerUid === currentUserUid;
 
   // ============================================================
   // ESTILOS
@@ -89,13 +128,20 @@ export default function NumberCell({
 
   const styles = STATUS_STYLES[status];
 
-  const isAvailable = status === "available";
+  const isAvailable =
+    status === "available";
 
   // ============================================================
-  // MI NÚMERO TAMBIÉN PUEDE ABRIRSE
+  // ¿SE PUEDE ABRIR?
+  //
+  // Disponible = sí
+  // Mi reserva = sí
+  // Reserva de otro usuario = no
+  // Vendido = no
   // ============================================================
 
-  const canOpen = isAvailable || mine;
+  const canOpen =
+    isAvailable || mine;
 
   // ============================================================
   // ETIQUETA
@@ -122,20 +168,35 @@ export default function NumberCell({
     `
     : "";
 
+  // ============================================================
+  // RENDER
+  // ============================================================
+
   return (
     <button
       type="button"
 
       /*
-       * IMPORTANTE:
-       * Disponible = se puede abrir
-       * Mi reserva = también se puede abrir
-       * Reserva de otra persona = bloqueada
-       * Vendido = bloqueado
+       * Disponible:
+       * puede abrirse.
+       *
+       * Mi reserva:
+       * puede abrirse nuevamente.
+       *
+       * Reserva de otro usuario:
+       * bloqueada.
+       *
+       * Vendido:
+       * bloqueado.
        */
+
       disabled={!canOpen}
 
-      onClick={canOpen ? onClick : undefined}
+      onClick={
+        canOpen
+          ? onClick
+          : undefined
+      }
 
       aria-label={`Número ${data.number}: ${label}`}
 
@@ -188,7 +249,6 @@ export default function NumberCell({
         }
       `}
     >
-
       {/* ========================================= */}
       {/* GLOW DISPONIBLE */}
       {/* ========================================= */}
@@ -255,7 +315,6 @@ export default function NumberCell({
       {/* ========================================= */}
 
       <span className="relative flex items-center gap-2">
-
         {/* ========================================= */}
         {/* STATUS DOT */}
         {/* ========================================= */}
@@ -319,7 +378,6 @@ export default function NumberCell({
         >
           {data.number}
         </span>
-
       </span>
 
       {/* ========================================= */}
@@ -405,8 +463,6 @@ export default function NumberCell({
           "
         />
       )}
-
     </button>
   );
 }
-

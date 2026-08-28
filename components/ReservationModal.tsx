@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,7 +9,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 
-import { db,auth } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
 import toast from "react-hot-toast";
 
@@ -29,6 +28,7 @@ const ADMIN_WHATSAPP = "573025636290";
 // ============================================================
 
 const RESERVATION_TIME_MINUTES = 30;
+
 const RESERVATION_TIME_MS =
   RESERVATION_TIME_MINUTES * 60 * 1000;
 
@@ -48,13 +48,23 @@ export default function ReservationModal({
 
   const [loading, setLoading] = useState(false);
 
-  // Indica si la reserva está activa
+  // ============================================================
+  // INDICA SI LA RESERVA PERTENECE AL USUARIO ACTUAL
+  // ============================================================
+
   const [reserved, setReserved] = useState(false);
 
-  // Hora exacta en la que termina la reserva
-  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  // ============================================================
+  // HORA EXACTA EN LA QUE TERMINA LA RESERVA
+  // ============================================================
 
-  // Tiempo restante
+  const [expiresAt, setExpiresAt] =
+    useState<number | null>(null);
+
+  // ============================================================
+  // TIEMPO RESTANTE
+  // ============================================================
+
   const [timeLeft, setTimeLeft] = useState(0);
 
   // ============================================================
@@ -104,25 +114,39 @@ export default function ReservationModal({
       Math.floor(milliseconds / 1000)
     );
 
-    const minutes = Math.floor(totalSeconds / 60);
+    const minutes = Math.floor(
+      totalSeconds / 60
+    );
+
     const seconds = totalSeconds % 60;
 
-    return `${String(minutes).padStart(2, "0")}:${String(
-      seconds
-    ).padStart(2, "0")}`;
+    return `${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
   }
 
   // ============================================================
-  // CARGAR RESERVA EXISTENTE DESDE FIRESTORE
+  // CARGAR RESERVA DESDE FIRESTORE
   //
-  // ESTO ES LO IMPORTANTE:
+  // IMPORTANTE:
   //
-  // Si cierras el modal en 20:15 y luego lo vuelves a abrir,
-  // NO empieza nuevamente en 30:00.
+  // NO usamos localStorage.
   //
-  // Se lee reservationExpiresAt desde Firestore y se calcula:
+  // La reserva se identifica mediante:
   //
-  // tiempo restante = fecha expiración - hora actual
+  // buyerUid === auth.currentUser.uid
+  //
+  // De esta forma funciona:
+  //
+  // - Localhost
+  // - Vercel
+  // - Otro computador
+  // - Otro navegador
+  // - Celular
+  //
+  // Siempre que el usuario inicie sesión con
+  // la misma cuenta de Firebase.
   // ============================================================
 
   useEffect(() => {
@@ -130,6 +154,26 @@ export default function ReservationModal({
 
     async function loadExistingReservation() {
       try {
+        // ======================================================
+        // OBTENER USUARIO ACTUAL
+        // ======================================================
+
+        const user = auth.currentUser;
+
+        if (!user) {
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
+            setTimeLeft(0);
+          }
+
+          return;
+        }
+
+        // ======================================================
+        // REFERENCIA DEL NÚMERO
+        // ======================================================
+
         const numberRef = doc(
           db,
           "raffles",
@@ -138,7 +182,8 @@ export default function ReservationModal({
           number.id
         );
 
-        const snapshot = await getDoc(numberRef);
+        const snapshot =
+          await getDoc(numberRef);
 
         if (!snapshot.exists()) {
           return;
@@ -147,7 +192,7 @@ export default function ReservationModal({
         const data = snapshot.data();
 
         // ======================================================
-        // VERIFICAR SI EL NÚMERO ESTÁ RESERVADO
+        // EL NÚMERO NO ESTÁ RESERVADO
         // ======================================================
 
         if (data.status !== "reserved") {
@@ -161,10 +206,30 @@ export default function ReservationModal({
         }
 
         // ======================================================
+        // VERIFICAR DUEÑO DE LA RESERVA
+        //
+        // ESTA ES LA PARTE MÁS IMPORTANTE.
+        //
+        // Solamente el usuario que tiene el mismo UID
+        // puede recuperar la reserva.
+        // ======================================================
+
+        if (data.buyerUid !== user.uid) {
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
+            setTimeLeft(0);
+          }
+
+          return;
+        }
+
+        // ======================================================
         // OBTENER FECHA DE EXPIRACIÓN
         // ======================================================
 
-        let expirationTime: number | null = null;
+        let expirationTime: number | null =
+          null;
 
         const storedExpiration =
           data.reservationExpiresAt;
@@ -185,7 +250,7 @@ export default function ReservationModal({
             storedExpiration.getTime();
         }
 
-        // Timestamp-like object
+        // Timestamp-like
         else if (
           storedExpiration &&
           typeof storedExpiration.toMillis ===
@@ -196,7 +261,7 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // SI NO EXISTE FECHA DE EXPIRACIÓN
+        // NO EXISTE FECHA DE EXPIRACIÓN
         // ======================================================
 
         if (!expirationTime) {
@@ -214,14 +279,14 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // CALCULAR TIEMPO ACTUAL
+        // CALCULAR TIEMPO RESTANTE
         // ======================================================
 
         const remaining =
           expirationTime - Date.now();
 
         // ======================================================
-        // LA RESERVA YA EXPIRÓ
+        // RESERVA EXPIRADA
         // ======================================================
 
         if (remaining <= 0) {
@@ -229,25 +294,38 @@ export default function ReservationModal({
             setReserved(true);
             setExpiresAt(expirationTime);
             setTimeLeft(0);
+
+            if (data.buyerName) {
+              setName(data.buyerName);
+            }
+
+            if (data.buyerPhone) {
+              setPhone(data.buyerPhone);
+            }
           }
 
           return;
         }
 
         // ======================================================
-        // RESERVA TODAVÍA ACTIVA
+        // RESERVA ACTIVA
         // ======================================================
 
         if (mounted) {
           setReserved(true);
-          setExpiresAt(expirationTime);
+
+          setExpiresAt(
+            expirationTime
+          );
+
           setTimeLeft(remaining);
 
-          // Recuperar datos del comprador
+          // Recuperar nombre
           if (data.buyerName) {
             setName(data.buyerName);
           }
 
+          // Recuperar teléfono
           if (data.buyerPhone) {
             setPhone(data.buyerPhone);
           }
@@ -270,9 +348,9 @@ export default function ReservationModal({
   // ============================================================
   // CONTADOR
   //
-  // El contador se basa SIEMPRE en expiresAt.
+  // SIEMPRE SE CALCULA CON expiresAt.
   //
-  // No vuelve a 30:00 al abrir nuevamente el modal.
+  // NO vuelve a 30:00 al cerrar y abrir.
   // ============================================================
 
   useEffect(() => {
@@ -280,18 +358,31 @@ export default function ReservationModal({
       return;
     }
 
-    // Calcular inmediatamente
+    // ==========================================================
+    // CALCULAR INMEDIATAMENTE
+    // ==========================================================
+
     const initialRemaining =
       expiresAt - Date.now();
 
     setTimeLeft(
-      Math.max(0, initialRemaining)
+      Math.max(
+        0,
+        initialRemaining
+      )
     );
 
-    // Si ya expiró
+    // ==========================================================
+    // YA EXPIRÓ
+    // ==========================================================
+
     if (initialRemaining <= 0) {
       return;
     }
+
+    // ==========================================================
+    // ACTUALIZAR CADA SEGUNDO
+    // ==========================================================
 
     const interval = setInterval(() => {
       const remaining =
@@ -299,7 +390,9 @@ export default function ReservationModal({
 
       if (remaining <= 0) {
         setTimeLeft(0);
+
         clearInterval(interval);
+
         return;
       }
 
@@ -318,17 +411,30 @@ export default function ReservationModal({
   async function handleSubmit() {
     const cleanName = name.trim();
     const cleanPhone = phone.trim();
+
+    // ==========================================================
+    // USUARIO DE FIREBASE
+    // ==========================================================
+
     const user = auth.currentUser;
 
-  if (!user) {
-  toast.error("Debes iniciar sesión para reservar un número.");
-  return;
-}
+    if (!user) {
+      toast.error(
+        "Debes iniciar sesión para reservar un número."
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // VALIDAR NOMBRE
+    // ==========================================================
 
     if (!cleanName) {
       toast.error(
         "Ingresa tu nombre completo"
       );
+
       return;
     }
 
@@ -336,13 +442,19 @@ export default function ReservationModal({
       toast.error(
         "El nombre debe tener al menos 3 caracteres"
       );
+
       return;
     }
+
+    // ==========================================================
+    // VALIDAR TELÉFONO
+    // ==========================================================
 
     if (!cleanPhone) {
       toast.error(
         "Ingresa tu número de teléfono"
       );
+
       return;
     }
 
@@ -350,8 +462,13 @@ export default function ReservationModal({
       toast.error(
         "Ingresa un teléfono válido"
       );
+
       return;
     }
+
+    // ==========================================================
+    // EVITAR DOBLE CLIC
+    // ==========================================================
 
     if (loading) {
       return;
@@ -374,9 +491,6 @@ export default function ReservationModal({
 
       // ========================================================
       // COMPROBAR ESTADO ACTUAL
-      //
-      // Evita reservar un número que ya fue reservado
-      // mientras el usuario tenía el modal abierto.
       // ========================================================
 
       const currentSnapshot =
@@ -386,6 +500,7 @@ export default function ReservationModal({
         toast.error(
           "El número ya no existe."
         );
+
         return;
       }
 
@@ -402,21 +517,40 @@ export default function ReservationModal({
         toast.error(
           "Este número ya está reservado."
         );
+
+        return;
+      }
+
+      // ========================================================
+      // SI YA ESTÁ VENDIDO
+      // ========================================================
+
+      if (
+        currentData.status === "sold"
+      ) {
+        toast.error(
+          "Este número ya fue vendido."
+        );
+
         return;
       }
 
       // ========================================================
       // CALCULAR EXPIRACIÓN
       //
-      // ESTA FECHA SE GUARDA EN FIRESTORE.
+      // IMPORTANTE:
       //
-      // Por ejemplo:
+      // La fecha se calcula una sola vez y se guarda
+      // en Firestore.
+      //
+      // Ejemplo:
       //
       // 10:00:00 -> reserva
-      // 10:30:00 -> expira
+      // 10:30:00 -> expiración
       //
-      // Si el usuario cierra y abre el modal a las 10:10,
-      // verá 20:00 y NO 30:00.
+      // Si vuelve a abrir a las 10:15:
+      //
+      // 10:30 - 10:15 = 15 minutos
       // ========================================================
 
       const reservationExpiresAt =
@@ -427,30 +561,38 @@ export default function ReservationModal({
       // GUARDAR RESERVA
       // ========================================================
 
-     await updateDoc(
-  doc(
-    db,
-    "raffles",
-    raffleId,
-    "numbers",
-    number.id
-  ),
-  {
-    status: "reserved",
+      await updateDoc(
+        numberRef,
+        {
+          status: "reserved",
 
-    buyerName: cleanName,
-    buyerPhone: cleanPhone,
+          buyerName: cleanName,
 
-    // UID REAL DEL USUARIO DE FIREBASE
-    buyerUid: user.uid,
+          buyerPhone: cleanPhone,
 
-    reservedAt: serverTimestamp(),
+          // ====================================================
+          // UID DEL USUARIO DE FIREBASE
+          // ====================================================
 
-    reservationExpiresAt: new Date(
-      reservationExpiresAt
-    ),
-  }
-);
+          buyerUid: user.uid,
+
+          // ====================================================
+          // FECHA DE RESERVA
+          // ====================================================
+
+          reservedAt:
+            serverTimestamp(),
+
+          // ====================================================
+          // FECHA DE EXPIRACIÓN
+          // ====================================================
+
+          reservationExpiresAt:
+            new Date(
+              reservationExpiresAt
+            ),
+        }
+      );
 
       // ========================================================
       // ACTUALIZAR ESTADO LOCAL
@@ -484,7 +626,7 @@ export default function ReservationModal({
   }
 
   // ============================================================
-  // ABRIR WHATSAPP CON COMPROBANTE
+  // WHATSAPP
   // ============================================================
 
   function handleWhatsApp() {
@@ -548,7 +690,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   }
 
   // ============================================================
-  // CLICK SOBRE EL OVERLAY
+  // CLICK OVERLAY
   // ============================================================
 
   function handleOverlayClick(
@@ -585,10 +727,6 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
       "
       onMouseDown={handleOverlayClick}
     >
-      {/* ====================================================== */}
-      {/* ESTILOS SCROLL */}
-      {/* ====================================================== */}
-
       <style>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none;
@@ -615,7 +753,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
           max-h-[calc(100dvh-24px)]
         "
       >
-        {/* Acabado sutil */}
+        {/* Acabado */}
 
         <div
           className="
@@ -763,7 +901,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
           "
         >
           {/* ================================================== */}
-          {/* PANTALLA DESPUÉS DE RESERVAR */}
+          {/* DESPUÉS DE RESERVAR */}
           {/* ================================================== */}
 
           {reserved ? (
@@ -825,17 +963,13 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </p>
               </div>
 
-              {/* ================================================== */}
               {/* INFORMACIÓN DEL NÚMERO */}
-              {/* ================================================== */}
 
               <div
                 className="
                   grid grid-cols-2 gap-3
                 "
               >
-                {/* Número */}
-
                 <div
                   className="
                     rounded-xl border
@@ -864,8 +998,6 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     {number.number}
                   </p>
                 </div>
-
-                {/* Precio */}
 
                 <div
                   className="
@@ -896,9 +1028,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </div>
               </div>
 
-              {/* ================================================== */}
               {/* CONTADOR */}
-              {/* ================================================== */}
 
               {!reservationExpired ? (
                 <div
@@ -973,9 +1103,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </div>
               )}
 
-              {/* ================================================== */}
-              {/* QR BRE-B */}
-              {/* ================================================== */}
+              {/* QR */}
 
               {!reservationExpired && (
                 <>
@@ -1026,9 +1154,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     </div>
                   </div>
 
-                  {/* ========================================= */}
                   {/* MÉTODOS DE PAGO */}
-                  {/* ========================================= */}
 
                   <div className="space-y-3">
                     <div className="text-center">
@@ -1041,10 +1167,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       </p>
                     </div>
 
-                    {/* BANCOLombia + NEQUI */}
-
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {/* BANCOLombia */}
+                      {/* BANCOLOMBIA */}
 
                       <div
                         className="
@@ -1229,9 +1353,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     </div>
                   </div>
 
-                  {/* ================================================== */}
                   {/* AVISO */}
-                  {/* ================================================== */}
 
                   <div
                     className="
@@ -1263,9 +1385,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </>
               )}
 
-              {/* ================================================== */}
               {/* DATOS RESERVA */}
-              {/* ================================================== */}
 
               <div
                 className="
@@ -1358,7 +1478,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.8"
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 00-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
                     />
                   </svg>
                 </div>
@@ -1428,9 +1548,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </div>
               </div>
 
-              {/* ================================================== */}
               {/* AVISO */}
-              {/* ================================================== */}
 
               <div
                 className="
@@ -1466,9 +1584,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </p>
               </div>
 
-              {/* ================================================== */}
               {/* DATOS DEL COMPRADOR */}
-              {/* ================================================== */}
 
               <div className="space-y-3 pt-0.5">
                 <p
@@ -1481,7 +1597,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   Datos del comprador
                 </p>
 
-                {/* Nombre */}
+                {/* NOMBRE */}
 
                 <div>
                   <label
@@ -1556,7 +1672,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   </div>
                 </div>
 
-                {/* Teléfono */}
+                {/* TELÉFONO */}
 
                 <div>
                   <label
@@ -1659,7 +1775,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
         >
           {reserved ? (
             <>
-              {/* BOTÓN WHATSAPP */}
+              {/* WHATSAPP */}
 
               {!reservationExpired && (
                 <button
@@ -1737,7 +1853,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
             </>
           ) : (
             <>
-              {/* BOTONES NORMALES */}
+              {/* BOTONES */}
 
               <div
                 className="
@@ -1847,4 +1963,3 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
     </div>
   );
 }
-
