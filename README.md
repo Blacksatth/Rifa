@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎟️ Rifa - Raffle Application
 
-## Getting Started
+A modern, fully-functional raffle application built with cutting-edge web technologies. Users can select lottery numbers, reserve them, and participate in exciting prize draws.
 
-First, run the development server:
+**Live Demo:** [rifa-mocha-mu.vercel.app](https://rifa-mocha-mu.vercel.app)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ✨ Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- 🎰 **Interactive Number Selection** - Users can browse and reserve raffle numbers in real-time
+- 📊 **Live Progress Tracking** - Dynamic sales progress visualization with percentage display
+- 🏆 **Prize Management** - Display detailed information about raffle prizes
+- 📅 **Draw Scheduling** - Display scheduled draw date, time, and method
+- 🔐 **Firebase Backend** - Real-time database integration for seamless data synchronization
+- 👨‍💼 **Admin Panel** - Dedicated interface to manage raffles, prizes, and numbers
+- 📱 **Responsive Design** - Optimized for desktop and mobile devices
+- ✨ **Modern UI** - Beautiful glassmorphism effects and smooth animations with Tailwind CSS
+- 🌙 **Dark Theme** - Sleek dark-themed interface with gradient accents
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🚀 Tech Stack
 
-To learn more about Next.js, take a look at the following resources:
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 16, React 19, TypeScript |
+| **Styling** | Tailwind CSS 4 |
+| **Backend** | Firebase (Firestore + Admin SDK) |
+| **Notifications** | React Hot Toast |
+| **Deployment** | Vercel |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📋 Prerequisites
 
-## Deploy on Vercel
+- Node.js 18+ 
+- npm or yarn
+- Firebase project with Firestore enabled
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ⚙️ Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Blacksatth/Rifa.git
+   cd Rifa
