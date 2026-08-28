@@ -1,6 +1,7 @@
 "use client";
 
 import { RaffleNumber } from "@/lib/types";
+import { isMine } from "@/lib/reservations";
 
 type NumberStatus =
   | "available"
@@ -63,6 +64,9 @@ export default function NumberCell({
   data,
   onClick,
 }: NumberCellProps) {
+  // ============================================================
+  // ESTADO DEL NÚMERO
+  // ============================================================
 
   const status: NumberStatus =
     data.status === "available" ||
@@ -71,31 +75,73 @@ export default function NumberCell({
       ? data.status
       : "sold";
 
+  // ============================================================
+  // ¿ESTE NÚMERO ES MÍO?
+  // ============================================================
+
+  const mine =
+    status === "reserved" && isMine(data.id);
+
+  // ============================================================
+  // ESTILOS
+  // ============================================================
+
   const styles = STATUS_STYLES[status];
 
   const isAvailable = status === "available";
+
+  // ============================================================
+  // ETIQUETA PERSONALIZADA
+  // ============================================================
+
+  const label = mine
+    ? "Tu reserva"
+    : styles.label;
+
+  // ============================================================
+  // CLASES PERSONALIZADAS PARA MI RESERVA
+  // ============================================================
+
+  const mineStyles = mine
+    ? `
+      border-sky-400/40
+      bg-sky-500/[0.10]
+      shadow-lg
+      shadow-sky-500/10
+      cursor-default
+    `
+    : "";
 
   return (
     <button
       type="button"
       disabled={!isAvailable}
       onClick={isAvailable ? onClick : undefined}
-      aria-label={`Número ${data.number}: ${styles.label}`}
+      aria-label={`Número ${data.number}: ${label}`}
       title={
         isAvailable
           ? `Seleccionar número ${data.number}`
-          : styles.label
+          : mine
+            ? `Tu número reservado: ${data.number}`
+            : styles.label
       }
       className={`
         group relative
+
         flex w-full
+
         min-h-[58px]
+
         flex-col
         items-center
         justify-center
+
         overflow-hidden
+
         rounded-xl
+
         border
+
         px-3
         py-2.5
 
@@ -109,6 +155,8 @@ export default function NumberCell({
 
         ${styles.container}
 
+        ${mineStyles}
+
         ${
           isAvailable
             ? "hover:-translate-y-0.5"
@@ -118,25 +166,62 @@ export default function NumberCell({
     >
 
       {/* ========================================= */}
-      {/* GLOW */}
-      {/* ========================================= */}x
+      {/* GLOW DISPONIBLE */}
+      {/* ========================================= */}
 
       {isAvailable && (
         <span
           className="
             pointer-events-none
+
             absolute
+
             -right-5
             -top-5
+
             h-14
             w-14
+
             rounded-full
+
             bg-emerald-400/10
+
             blur-xl
+
             opacity-0
+
             transition-opacity
             duration-300
+
             group-hover:opacity-100
+          "
+        />
+      )}
+
+      {/* ========================================= */}
+      {/* GLOW DE MI RESERVA */}
+      {/* ========================================= */}
+
+      {mine && (
+        <span
+          className="
+            pointer-events-none
+
+            absolute
+
+            -right-5
+            -top-5
+
+            h-14
+            w-14
+
+            rounded-full
+
+            bg-sky-400/10
+
+            blur-xl
+
+            opacity-100
           "
         />
       )}
@@ -147,31 +232,50 @@ export default function NumberCell({
 
       <span className="relative flex items-center gap-2">
 
+        {/* ========================================= */}
         {/* STATUS DOT */}
+        {/* ========================================= */}
 
         <span
           className={`
             h-1.5
             w-1.5
+
             shrink-0
+
             rounded-full
-            ${styles.dot}
+
+            ${mine
+              ? "bg-sky-400 shadow-lg shadow-sky-400/60"
+              : styles.dot
+            }
 
             ${
               isAvailable
                 ? "animate-pulse shadow-lg"
                 : ""
             }
+
+            ${
+              mine
+                ? "animate-pulse"
+                : ""
+            }
           `}
         />
 
+        {/* ========================================= */}
         {/* NUMBER */}
+        {/* ========================================= */}
 
         <span
           className={`
             text-sm
+
             font-bold
+
             tracking-wide
+
             transition-transform
             duration-200
 
@@ -181,7 +285,11 @@ export default function NumberCell({
                 : ""
             }
 
-            ${styles.number}
+            ${
+              mine
+                ? "text-sky-300"
+                : styles.number
+            }
           `}
         >
           {data.number}
@@ -194,17 +302,27 @@ export default function NumberCell({
       {/* ========================================= */}
 
       <span
-        className="
+        className={`
           relative
+
           mt-1
+
           text-[9px]
+
           font-semibold
+
           uppercase
+
           tracking-wider
-          opacity-60
-        "
+
+          ${
+            mine
+              ? "text-sky-300 opacity-90"
+              : "opacity-60"
+          }
+        `}
       >
-        {styles.label}
+        {label}
       </span>
 
       {/* ========================================= */}
@@ -215,16 +333,50 @@ export default function NumberCell({
         <span
           className="
             absolute
+
             bottom-0
+
             left-1/2
+
             h-[2px]
+
             w-0
+
             -translate-x-1/2
+
             rounded-full
+
             bg-emerald-400
+
             transition-all
             duration-300
+
             group-hover:w-1/2
+          "
+        />
+      )}
+
+      {/* ========================================= */}
+      {/* MY RESERVATION INDICATOR */}
+      {/* ========================================= */}
+
+      {mine && (
+        <span
+          className="
+            absolute
+
+            bottom-0
+            left-1/2
+
+            h-[2px]
+
+            w-1/2
+
+            -translate-x-1/2
+
+            rounded-full
+
+            bg-sky-400
           "
         />
       )}
