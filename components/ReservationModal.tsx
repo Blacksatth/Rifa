@@ -18,7 +18,8 @@ import toast from "react-hot-toast";
 // WHATSAPP DEL ADMINISTRADOR
 // ============================================================
 
-const ADMIN_WHATSAPP = "573025636290";
+const ADMIN_WHATSAPP =
+  "573025636290";
 
 // ============================================================
 // TIEMPO DE RESERVA
@@ -27,82 +28,9 @@ const ADMIN_WHATSAPP = "573025636290";
 const RESERVATION_TIME_MINUTES = 30;
 
 const RESERVATION_TIME_MS =
-  RESERVATION_TIME_MINUTES * 60 * 1000;
-
-// ============================================================
-// VALIDACIÓN Y SEGURIDAD
-// ============================================================
-
-const NAME_MAX_LENGTH = 60;
-const PHONE_MAX_LENGTH = 20;
-
-// Solo letras (con acentos/ñ), espacios y algunos signos comunes en nombres
-const NAME_REGEX = /^[a-zA-ZÀ-ÿ\u00f1\u00d1\s'.-]+$/;
-
-// Solo dígitos, espacios, guiones y un "+" opcional al inicio
-const PHONE_REGEX = /^\+?[0-9\s-]+$/;
-
-function sanitizeForWhatsApp(text: string) {
-  // Elimina saltos de línea y caracteres de formato de WhatsApp
-  // que podrían usarse para inyectar texto falso en el mensaje
-  return text
-    .replace(/[\r\n]+/g, " ")
-    .replace(/[*_~`]/g, "")
-    .trim();
-}
-
-function validateName(value: string): string | null {
-  const cleanName = value.trim();
-
-  if (!cleanName) {
-    return "Ingresa tu nombre completo";
-  }
-
-  if (cleanName.length < 3) {
-    return "El nombre debe tener al menos 3 caracteres";
-  }
-
-  if (cleanName.length > NAME_MAX_LENGTH) {
-    return `El nombre no puede superar los ${NAME_MAX_LENGTH} caracteres`;
-  }
-
-  if (!NAME_REGEX.test(cleanName)) {
-    return "El nombre solo puede contener letras y espacios";
-  }
-
-  // Al menos dos palabras (nombre y apellido)
-  const words = cleanName.split(/\s+/).filter(Boolean);
-
-  if (words.length < 2) {
-    return "Ingresa tu nombre y apellido completos";
-  }
-
-  return null;
-}
-
-function validatePhone(value: string): string | null {
-  const cleanPhone = value.trim();
-
-  if (!cleanPhone) {
-    return "Ingresa tu número de teléfono";
-  }
-
-  if (!PHONE_REGEX.test(cleanPhone)) {
-    return "El teléfono solo puede contener números";
-  }
-
-  const digitsOnly = cleanPhone.replace(/[^0-9]/g, "");
-
-  if (digitsOnly.length < 7) {
-    return "Ingresa un teléfono válido (mínimo 7 dígitos)";
-  }
-
-  if (digitsOnly.length > 15) {
-    return "El teléfono ingresado no es válido";
-  }
-
-  return null;
-}
+  RESERVATION_TIME_MINUTES *
+  60 *
+  1000;
 
 export default function ReservationModal({
   raffleId,
@@ -115,62 +43,93 @@ export default function ReservationModal({
   number: RaffleNumber;
   onClose: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [reserved, setReserved] = useState(false);
-  const [expiresAt, setExpiresAt] = useState<number | null>(
-    null
-  );
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [name, setName] =
+    useState("");
+
+  const [phone, setPhone] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [reserved, setReserved] =
+    useState(false);
+
+  const [expiresAt, setExpiresAt] =
+    useState<number | null>(null);
+
+  const [timeLeft, setTimeLeft] =
+    useState(0);
 
   // ============================================================
   // INFORMACIÓN RIFA
   // ============================================================
 
-  const raffleData = raffle as Raffle & {
-    name?: string;
-    title?: string;
-    price?: number;
-    ticketPrice?: number;
-  };
+  const raffleData =
+    raffle as Raffle & {
+      name?: string;
+      title?: string;
+      price?: number;
+      ticketPrice?: number;
+    };
 
   const raffleName =
-    raffleData.name || raffleData.title || "Rifa";
+    raffleData.name ||
+    raffleData.title ||
+    "Rifa";
 
   const ticketPrice =
-    raffleData.price ?? raffleData.ticketPrice ?? null;
+    raffleData.price ??
+    raffleData.ticketPrice ??
+    null;
 
   // ============================================================
   // PRECIO
   // ============================================================
 
-  function formatPrice(price: number | null) {
+  function formatPrice(
+    price: number | null
+  ) {
     if (price === null) {
       return "Consultar precio";
     }
 
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      maximumFractionDigits: 0,
-    }).format(price);
+    return new Intl.NumberFormat(
+      "es-CO",
+      {
+        style: "currency",
+        currency: "COP",
+        maximumFractionDigits: 0,
+      }
+    ).format(price);
   }
 
   // ============================================================
   // TIEMPO
   // ============================================================
 
-  function formatTime(milliseconds: number) {
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(milliseconds / 1000)
-    );
+  function formatTime(
+    milliseconds: number
+  ) {
+    const totalSeconds =
+      Math.max(
+        0,
+        Math.floor(
+          milliseconds / 1000
+        )
+      );
 
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
+    const minutes =
+      Math.floor(
+        totalSeconds / 60
+      );
 
-    return `${String(minutes).padStart(2, "0")}:${String(
+    const seconds =
+      totalSeconds % 60;
+
+    return `${String(
+      minutes
+    ).padStart(2, "0")}:${String(
       seconds
     ).padStart(2, "0")}`;
   }
@@ -195,27 +154,31 @@ export default function ReservationModal({
          * desde el mismo navegador, localStorage conserva
          * el mismo visitorId.
          */
-        const visitorId = getVisitorId();
+        const visitorId =
+          getVisitorId();
 
         if (!visitorId) {
           return;
         }
 
-        const numberRef = doc(
-          db,
-          "raffles",
-          raffleId,
-          "numbers",
-          number.id
-        );
+        const numberRef =
+          doc(
+            db,
+            "raffles",
+            raffleId,
+            "numbers",
+            number.id
+          );
 
-        const snapshot = await getDoc(numberRef);
+        const snapshot =
+          await getDoc(numberRef);
 
         if (!snapshot.exists()) {
           return;
         }
 
-        const data = snapshot.data();
+        const data =
+          snapshot.data();
 
         // ======================================================
         // SEGURIDAD
@@ -241,27 +204,51 @@ export default function ReservationModal({
         // OBTENER EXPIRACIÓN
         // ======================================================
 
-        let expirationTime: number | null = null;
+        let expirationTime:
+          | number
+          | null = null;
 
-        const storedExpiration = data.reservationExpiresAt;
+        const storedExpiration =
+          data.reservationExpiresAt;
 
-        if (storedExpiration instanceof Timestamp) {
-          expirationTime = storedExpiration.toMillis();
-        } else if (storedExpiration instanceof Date) {
-          expirationTime = storedExpiration.getTime();
+        if (
+          storedExpiration instanceof
+          Timestamp
+        ) {
+          expirationTime =
+            storedExpiration.toMillis();
+        } else if (
+          storedExpiration instanceof Date
+        ) {
+          expirationTime =
+            storedExpiration.getTime();
         } else if (
           storedExpiration &&
-          typeof storedExpiration.toMillis === "function"
+          typeof storedExpiration.toMillis ===
+            "function"
         ) {
-          expirationTime = storedExpiration.toMillis();
-        } else if (typeof storedExpiration === "string") {
-          const parsed = new Date(storedExpiration).getTime();
+          expirationTime =
+            storedExpiration.toMillis();
+        } else if (
+          typeof storedExpiration ===
+          "string"
+        ) {
+          const parsed =
+            new Date(
+              storedExpiration
+            ).getTime();
 
-          if (!Number.isNaN(parsed)) {
+          if (
+            !Number.isNaN(parsed)
+          ) {
             expirationTime = parsed;
           }
-        } else if (typeof storedExpiration === "number") {
-          expirationTime = storedExpiration;
+        } else if (
+          typeof storedExpiration ===
+          "number"
+        ) {
+          expirationTime =
+            storedExpiration;
         }
 
         // ======================================================
@@ -275,11 +262,15 @@ export default function ReservationModal({
             setTimeLeft(0);
 
             if (data.buyerName) {
-              setName(data.buyerName);
+              setName(
+                data.buyerName
+              );
             }
 
             if (data.buyerPhone) {
-              setPhone(data.buyerPhone);
+              setPhone(
+                data.buyerPhone
+              );
             }
           }
 
@@ -290,7 +281,9 @@ export default function ReservationModal({
         // TIEMPO RESTANTE
         // ======================================================
 
-        const remaining = expirationTime - Date.now();
+        const remaining =
+          expirationTime -
+          Date.now();
 
         // ======================================================
         // RESERVA EXPIRADA
@@ -299,15 +292,23 @@ export default function ReservationModal({
         if (remaining <= 0) {
           if (mounted) {
             setReserved(true);
-            setExpiresAt(expirationTime);
+
+            setExpiresAt(
+              expirationTime
+            );
+
             setTimeLeft(0);
 
             if (data.buyerName) {
-              setName(data.buyerName);
+              setName(
+                data.buyerName
+              );
             }
 
             if (data.buyerPhone) {
-              setPhone(data.buyerPhone);
+              setPhone(
+                data.buyerPhone
+              );
             }
           }
 
@@ -320,19 +321,32 @@ export default function ReservationModal({
 
         if (mounted) {
           setReserved(true);
-          setExpiresAt(expirationTime);
-          setTimeLeft(remaining);
+
+          setExpiresAt(
+            expirationTime
+          );
+
+          setTimeLeft(
+            remaining
+          );
 
           if (data.buyerName) {
-            setName(data.buyerName);
+            setName(
+              data.buyerName
+            );
           }
 
           if (data.buyerPhone) {
-            setPhone(data.buyerPhone);
+            setPhone(
+              data.buyerPhone
+            );
           }
         }
       } catch (error) {
-        console.error("Error cargando reserva:", error);
+        console.error(
+          "Error cargando reserva:",
+          error
+        );
       }
     }
 
@@ -341,86 +355,132 @@ export default function ReservationModal({
     return () => {
       mounted = false;
     };
-  }, [raffleId, number.id]);
+  }, [
+    raffleId,
+    number.id,
+  ]);
 
   // ============================================================
   // CONTADOR
   // ============================================================
 
   useEffect(() => {
-    if (!reserved || !expiresAt) {
+    if (
+      !reserved ||
+      !expiresAt
+    ) {
       return;
     }
 
-    const initialRemaining = expiresAt - Date.now();
+    const initialRemaining =
+      expiresAt -
+      Date.now();
 
-    setTimeLeft(Math.max(0, initialRemaining));
+    setTimeLeft(
+      Math.max(
+        0,
+        initialRemaining
+      )
+    );
 
-    if (initialRemaining <= 0) {
+    if (
+      initialRemaining <= 0
+    ) {
       return;
     }
 
-    const interval = setInterval(() => {
-      const remaining = expiresAt - Date.now();
+    const interval =
+      setInterval(() => {
+        const remaining =
+          expiresAt -
+          Date.now();
 
-      if (remaining <= 0) {
-        setTimeLeft(0);
-        clearInterval(interval);
-        return;
-      }
+        if (remaining <= 0) {
+          setTimeLeft(0);
 
-      setTimeLeft(remaining);
-    }, 1000);
+          clearInterval(
+            interval
+          );
+
+          return;
+        }
+
+        setTimeLeft(
+          remaining
+        );
+      }, 1000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [reserved, expiresAt]);
+  }, [
+    reserved,
+    expiresAt,
+  ]);
 
   // ============================================================
   // RESERVAR
   // ============================================================
 
   async function handleSubmit() {
+    const cleanName =
+      name.trim();
+
+    const cleanPhone =
+      phone.trim();
+
     if (loading) {
       return;
     }
 
-    const cleanName = name.trim();
-    const cleanPhone = phone.trim();
+    if (!cleanName) {
+      toast.error(
+        "Ingresa tu nombre completo"
+      );
 
-    // ==========================================================
-    // VALIDACIÓN DE NOMBRE
-    // ==========================================================
-
-    const nameError = validateName(cleanName);
-
-    if (nameError) {
-      toast.error(nameError);
       return;
     }
 
-    // ==========================================================
-    // VALIDACIÓN DE TELÉFONO
-    // ==========================================================
+    if (
+      cleanName.length < 3
+    ) {
+      toast.error(
+        "El nombre debe tener al menos 3 caracteres"
+      );
 
-    const phoneError = validatePhone(cleanPhone);
-
-    if (phoneError) {
-      toast.error(phoneError);
       return;
     }
 
-    // ==========================================================
+    if (!cleanPhone) {
+      toast.error(
+        "Ingresa tu número de teléfono"
+      );
+
+      return;
+    }
+
+    if (
+      cleanPhone.length < 7
+    ) {
+      toast.error(
+        "Ingresa un teléfono válido"
+      );
+
+      return;
+    }
+
+    // ========================================================
     // VISITOR ID
-    // ==========================================================
+    // ========================================================
 
-    const visitorId = getVisitorId();
+    const visitorId =
+      getVisitorId();
 
     if (!visitorId) {
       toast.error(
         "No se pudo identificar tu navegador. Recarga la página e intenta nuevamente."
       );
+
       return;
     }
 
@@ -431,33 +491,47 @@ export default function ReservationModal({
       // REFERENCIA
       // ========================================================
 
-      const numberRef = doc(
-        db,
-        "raffles",
-        raffleId,
-        "numbers",
-        number.id
-      );
+      const numberRef =
+        doc(
+          db,
+          "raffles",
+          raffleId,
+          "numbers",
+          number.id
+        );
 
       // ========================================================
       // COMPROBAR ESTADO ACTUAL
       // ========================================================
 
-      const currentSnapshot = await getDoc(numberRef);
+      const currentSnapshot =
+        await getDoc(numberRef);
 
-      if (!currentSnapshot.exists()) {
-        toast.error("El número ya no existe.");
+      if (
+        !currentSnapshot.exists()
+      ) {
+        toast.error(
+          "El número ya no existe."
+        );
+
         return;
       }
 
-      const currentData = currentSnapshot.data();
+      const currentData =
+        currentSnapshot.data();
 
       // ========================================================
       // YA ESTÁ RESERVADO
       // ========================================================
 
-      if (currentData.status === "reserved") {
-        toast.error("Este número ya está reservado.");
+      if (
+        currentData.status ===
+        "reserved"
+      ) {
+        toast.error(
+          "Este número ya está reservado."
+        );
+
         return;
       }
 
@@ -465,54 +539,76 @@ export default function ReservationModal({
       // YA ESTÁ VENDIDO
       // ========================================================
 
-      if (currentData.status === "sold") {
-        toast.error("Este número ya fue vendido.");
+      if (
+        currentData.status ===
+        "sold"
+      ) {
+        toast.error(
+          "Este número ya fue vendido."
+        );
+
         return;
       }
 
       // ========================================================
-      // DATOS SANEADOS PARA GUARDAR
+      // EXPIRACIÓN
       // ========================================================
 
-      const safeName = cleanName
-        .replace(/\s+/g, " ")
-        .slice(0, NAME_MAX_LENGTH);
-
-      const safePhone = cleanPhone
-        .replace(/[^0-9+\s-]/g, "")
-        .slice(0, PHONE_MAX_LENGTH);
-
       const reservationExpiresAt =
-        Date.now() + RESERVATION_TIME_MS;
+        Date.now() +
+        RESERVATION_TIME_MS;
 
       // ========================================================
       // GUARDAR RESERVA
       // ========================================================
 
-      await updateDoc(numberRef, {
-        status: "reserved",
-        buyerName: safeName,
-        buyerPhone: safePhone,
-        buyerVisitorId: visitorId,
-        reservedAt: serverTimestamp(),
-        reservationExpiresAt: new Date(
-          reservationExpiresAt
-        ),
-      });
+      await updateDoc(
+        numberRef,
+        {
+          status:
+            "reserved",
+
+          buyerName:
+            cleanName,
+
+          buyerPhone:
+            cleanPhone,
+
+          buyerVisitorId:
+            visitorId,
+
+          reservedAt:
+            serverTimestamp(),
+
+          reservationExpiresAt:
+            new Date(
+              reservationExpiresAt
+            ),
+        }
+      );
 
       // ========================================================
       // ACTUALIZAR UI
       // ========================================================
 
-      setName(safeName);
-      setPhone(safePhone);
-      setExpiresAt(reservationExpiresAt);
-      setTimeLeft(RESERVATION_TIME_MS);
+      setExpiresAt(
+        reservationExpiresAt
+      );
+
+      setTimeLeft(
+        RESERVATION_TIME_MS
+      );
+
       setReserved(true);
 
-      toast.success("¡Número reservado correctamente!");
+      toast.success(
+        "¡Número reservado correctamente!"
+      );
     } catch (error) {
-      console.error("Error reservando número:", error);
+      console.error(
+        "Error reservando número:",
+        error
+      );
 
       toast.error(
         "No se pudo reservar el número. Intenta nuevamente."
@@ -528,12 +624,12 @@ export default function ReservationModal({
 
   function handleWhatsApp() {
     if (timeLeft <= 0) {
-      toast.error("El tiempo de reserva ha terminado.");
+      toast.error(
+        "El tiempo de reserva ha terminado."
+      );
+
       return;
     }
-
-    const safeName = sanitizeForWhatsApp(name.trim());
-    const safePhone = sanitizeForWhatsApp(phone.trim());
 
     const whatsappMessage = `
 🎟️ *COMPROBANTE DE PAGO - RIFA*
@@ -544,9 +640,9 @@ export default function ReservationModal({
 
 🔢 *Número:* ${number.number}
 
-👤 *Nombre:* ${safeName}
+👤 *Nombre:* ${name.trim()}
 
-📱 *Teléfono:* ${safePhone}
+📱 *Teléfono:* ${phone.trim()}
 
 💰 *Valor:* ${formatPrice(ticketPrice)}
 
@@ -563,9 +659,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
     const whatsappUrl =
       `https://wa.me/${ADMIN_WHATSAPP}?text=` +
-      encodeURIComponent(whatsappMessage);
+      encodeURIComponent(
+        whatsappMessage
+      );
 
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    window.open(
+      whatsappUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   // ============================================================
@@ -587,7 +689,11 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   function handleOverlayClick(
     e: React.MouseEvent<HTMLDivElement>
   ) {
-    if (e.target === e.currentTarget && !loading) {
+    if (
+      e.target ===
+        e.currentTarget &&
+      !loading
+    ) {
       onClose();
     }
   }
@@ -597,7 +703,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   // ============================================================
 
   const reservationExpired =
-    reserved && expiresAt !== null && timeLeft <= 0;
+    reserved &&
+    expiresAt !== null &&
+    timeLeft <= 0;
 
   // ============================================================
   // RENDER
@@ -615,7 +723,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
         duration-200
         sm:p-4
       "
-      onMouseDown={handleOverlayClick}
+      onMouseDown={
+        handleOverlayClick
+      }
     >
       <style>{`
         .no-scrollbar::-webkit-scrollbar {
@@ -768,7 +878,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   text-violet-400/90
                 "
               >
-                {reserved ? "Reserva realizada" : "Reserva"}
+                {reserved
+                  ? "Reserva realizada"
+                  : "Reserva"}
               </p>
 
               <h2
@@ -993,7 +1105,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       text-emerald-400
                     "
                   >
-                    {formatPrice(ticketPrice)}
+                    {formatPrice(
+                      ticketPrice
+                    )}
                   </p>
                 </div>
               </div>
@@ -1034,7 +1148,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       text-white
                     "
                   >
-                    {formatTime(timeLeft)}
+                    {formatTime(
+                      timeLeft
+                    )}
                   </p>
 
                   <p
@@ -1059,7 +1175,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     text-center
                   "
                 >
-                  <div className="text-2xl">⏰</div>
+                  <div className="text-2xl">
+                    ⏰
+                  </div>
 
                   <p
                     className="
@@ -1639,7 +1757,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       text-emerald-400
                     "
                   >
-                    {formatPrice(ticketPrice)}
+                    {formatPrice(
+                      ticketPrice
+                    )}
                   </p>
                 </div>
               </div>
@@ -1720,12 +1840,17 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     type="text"
                     autoComplete="name"
                     disabled={loading}
-                    maxLength={NAME_MAX_LENGTH}
                     placeholder="Ej. Juan Pérez"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) =>
+                      setName(
+                        e.target.value
+                      )
+                    }
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (
+                        e.key === "Enter"
+                      ) {
                         handleSubmit();
                       }
                     }}
@@ -1774,12 +1899,17 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     inputMode="tel"
                     autoComplete="tel"
                     disabled={loading}
-                    maxLength={PHONE_MAX_LENGTH}
                     placeholder="Ej. 300 123 4567"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) =>
+                      setPhone(
+                        e.target.value
+                      )
+                    }
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (
+                        e.key === "Enter"
+                      ) {
                         handleSubmit();
                       }
                     }}
@@ -1843,7 +1973,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
               {!reservationExpired && (
                 <button
                   type="button"
-                  onClick={handleWhatsApp}
+                  onClick={
+                    handleWhatsApp
+                  }
                   className="
                     flex
                     h-12
@@ -1996,12 +2128,19 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         "
                       />
 
-                      <span>Reservando...</span>
+                      <span>
+                        Reservando...
+                      </span>
                     </>
                   ) : (
                     <>
-                      <span>✓</span>
-                      <span>Reservar número</span>
+                      <span>
+                        ✓
+                      </span>
+
+                      <span>
+                        Reservar número
+                      </span>
                     </>
                   )}
                 </button>
