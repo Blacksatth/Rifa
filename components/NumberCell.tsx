@@ -1,3 +1,4 @@
+
 "use client";
 
 import { RaffleNumber } from "@/lib/types";
@@ -91,7 +92,13 @@ export default function NumberCell({
   const isAvailable = status === "available";
 
   // ============================================================
-  // ETIQUETA PERSONALIZADA
+  // MI NÚMERO TAMBIÉN PUEDE ABRIRSE
+  // ============================================================
+
+  const canOpen = isAvailable || mine;
+
+  // ============================================================
+  // ETIQUETA
   // ============================================================
 
   const label = mine
@@ -99,7 +106,7 @@ export default function NumberCell({
     : styles.label;
 
   // ============================================================
-  // CLASES PERSONALIZADAS PARA MI RESERVA
+  // ESTILOS DE MI RESERVA
   // ============================================================
 
   const mineStyles = mine
@@ -108,27 +115,44 @@ export default function NumberCell({
       bg-sky-500/[0.10]
       shadow-lg
       shadow-sky-500/10
-      cursor-default
+      cursor-pointer
+      hover:border-sky-300/60
+      hover:bg-sky-500/[0.16]
+      hover:-translate-y-0.5
     `
     : "";
 
   return (
     <button
       type="button"
-      disabled={!isAvailable}
-      onClick={isAvailable ? onClick : undefined}
+
+      /*
+       * IMPORTANTE:
+       * Disponible = se puede abrir
+       * Mi reserva = también se puede abrir
+       * Reserva de otra persona = bloqueada
+       * Vendido = bloqueado
+       */
+      disabled={!canOpen}
+
+      onClick={canOpen ? onClick : undefined}
+
       aria-label={`Número ${data.number}: ${label}`}
+
       title={
         isAvailable
           ? `Seleccionar número ${data.number}`
           : mine
-            ? `Tu número reservado: ${data.number}`
+            ? `Abrir tu reserva: ${data.number}`
             : styles.label
       }
-      className={`
-        group relative
 
-        flex w-full
+      className={`
+        group
+        relative
+
+        flex
+        w-full
 
         min-h-[58px]
 
@@ -158,9 +182,9 @@ export default function NumberCell({
         ${mineStyles}
 
         ${
-          isAvailable
-            ? "hover:-translate-y-0.5"
-            : ""
+          canOpen
+            ? "cursor-pointer"
+            : "cursor-not-allowed"
         }
       `}
     >
@@ -245,9 +269,10 @@ export default function NumberCell({
 
             rounded-full
 
-            ${mine
-              ? "bg-sky-400 shadow-lg shadow-sky-400/60"
-              : styles.dot
+            ${
+              mine
+                ? "bg-sky-400 shadow-lg shadow-sky-400/60"
+                : styles.dot
             }
 
             ${
@@ -280,7 +305,7 @@ export default function NumberCell({
             duration-200
 
             ${
-              isAvailable
+              canOpen
                 ? "group-hover:scale-105"
                 : ""
             }
@@ -384,3 +409,4 @@ export default function NumberCell({
     </button>
   );
 }
+
