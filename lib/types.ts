@@ -8,6 +8,8 @@ export interface Raffle {
   digits: number;
   active: boolean;
 
+  userId?: string;
+
   drawDate: string;
   drawTime: string;
   drawMethod: string;
@@ -17,12 +19,20 @@ export interface Raffle {
 
 export interface RaffleNumber {
   id: string;
-
   number: string;
 
   status: "available" | "reserved" | "sold";
 
   buyerName: string | null;
-
   buyerPhone: string | null;
+
+  // ==========================================================
+  // DATOS DE LA RESERVA
+  // ==========================================================
+
+  reservationUserId?: string | null;
+
+  reservationExpiresAt?: any;
+
+  reservedAt?: any;
 }

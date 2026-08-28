@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,8 +6,11 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  getDoc,
+  Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+
+import { db,auth } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
 import toast from "react-hot-toast";
 
@@ -44,16 +48,14 @@ export default function ReservationModal({
 
   const [loading, setLoading] = useState(false);
 
-  // Indica si la reserva fue realizada correctamente
+  // Indica si la reserva está activa
   const [reserved, setReserved] = useState(false);
 
   // Hora exacta en la que termina la reserva
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
 
   // Tiempo restante
-  const [timeLeft, setTimeLeft] = useState(
-    RESERVATION_TIME_MS
-  );
+  const [timeLeft, setTimeLeft] = useState(0);
 
   // ============================================================
   // INFORMACIÓN DE LA RIFA
@@ -111,7 +113,166 @@ export default function ReservationModal({
   }
 
   // ============================================================
-  // CONTADOR DE 30 MINUTOS
+  // CARGAR RESERVA EXISTENTE DESDE FIRESTORE
+  //
+  // ESTO ES LO IMPORTANTE:
+  //
+  // Si cierras el modal en 20:15 y luego lo vuelves a abrir,
+  // NO empieza nuevamente en 30:00.
+  //
+  // Se lee reservationExpiresAt desde Firestore y se calcula:
+  //
+  // tiempo restante = fecha expiración - hora actual
+  // ============================================================
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadExistingReservation() {
+      try {
+        const numberRef = doc(
+          db,
+          "raffles",
+          raffleId,
+          "numbers",
+          number.id
+        );
+
+        const snapshot = await getDoc(numberRef);
+
+        if (!snapshot.exists()) {
+          return;
+        }
+
+        const data = snapshot.data();
+
+        // ======================================================
+        // VERIFICAR SI EL NÚMERO ESTÁ RESERVADO
+        // ======================================================
+
+        if (data.status !== "reserved") {
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
+            setTimeLeft(0);
+          }
+
+          return;
+        }
+
+        // ======================================================
+        // OBTENER FECHA DE EXPIRACIÓN
+        // ======================================================
+
+        let expirationTime: number | null = null;
+
+        const storedExpiration =
+          data.reservationExpiresAt;
+
+        // Firebase Timestamp
+        if (
+          storedExpiration instanceof Timestamp
+        ) {
+          expirationTime =
+            storedExpiration.toMillis();
+        }
+
+        // Date
+        else if (
+          storedExpiration instanceof Date
+        ) {
+          expirationTime =
+            storedExpiration.getTime();
+        }
+
+        // Timestamp-like object
+        else if (
+          storedExpiration &&
+          typeof storedExpiration.toMillis ===
+            "function"
+        ) {
+          expirationTime =
+            storedExpiration.toMillis();
+        }
+
+        // ======================================================
+        // SI NO EXISTE FECHA DE EXPIRACIÓN
+        // ======================================================
+
+        if (!expirationTime) {
+          console.warn(
+            "La reserva existe pero no tiene reservationExpiresAt"
+          );
+
+          if (mounted) {
+            setReserved(true);
+            setExpiresAt(null);
+            setTimeLeft(0);
+          }
+
+          return;
+        }
+
+        // ======================================================
+        // CALCULAR TIEMPO ACTUAL
+        // ======================================================
+
+        const remaining =
+          expirationTime - Date.now();
+
+        // ======================================================
+        // LA RESERVA YA EXPIRÓ
+        // ======================================================
+
+        if (remaining <= 0) {
+          if (mounted) {
+            setReserved(true);
+            setExpiresAt(expirationTime);
+            setTimeLeft(0);
+          }
+
+          return;
+        }
+
+        // ======================================================
+        // RESERVA TODAVÍA ACTIVA
+        // ======================================================
+
+        if (mounted) {
+          setReserved(true);
+          setExpiresAt(expirationTime);
+          setTimeLeft(remaining);
+
+          // Recuperar datos del comprador
+          if (data.buyerName) {
+            setName(data.buyerName);
+          }
+
+          if (data.buyerPhone) {
+            setPhone(data.buyerPhone);
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Error cargando reserva:",
+          error
+        );
+      }
+    }
+
+    loadExistingReservation();
+
+    return () => {
+      mounted = false;
+    };
+  }, [raffleId, number.id]);
+
+  // ============================================================
+  // CONTADOR
+  //
+  // El contador se basa SIEMPRE en expiresAt.
+  //
+  // No vuelve a 30:00 al abrir nuevamente el modal.
   // ============================================================
 
   useEffect(() => {
@@ -119,8 +280,22 @@ export default function ReservationModal({
       return;
     }
 
+    // Calcular inmediatamente
+    const initialRemaining =
+      expiresAt - Date.now();
+
+    setTimeLeft(
+      Math.max(0, initialRemaining)
+    );
+
+    // Si ya expiró
+    if (initialRemaining <= 0) {
+      return;
+    }
+
     const interval = setInterval(() => {
-      const remaining = expiresAt - Date.now();
+      const remaining =
+        expiresAt - Date.now();
 
       if (remaining <= 0) {
         setTimeLeft(0);
@@ -143,9 +318,17 @@ export default function ReservationModal({
   async function handleSubmit() {
     const cleanName = name.trim();
     const cleanPhone = phone.trim();
+    const user = auth.currentUser;
+
+  if (!user) {
+  toast.error("Debes iniciar sesión para reservar un número.");
+  return;
+}
 
     if (!cleanName) {
-      toast.error("Ingresa tu nombre completo");
+      toast.error(
+        "Ingresa tu nombre completo"
+      );
       return;
     }
 
@@ -157,12 +340,16 @@ export default function ReservationModal({
     }
 
     if (!cleanPhone) {
-      toast.error("Ingresa tu número de teléfono");
+      toast.error(
+        "Ingresa tu número de teléfono"
+      );
       return;
     }
 
     if (cleanPhone.length < 7) {
-      toast.error("Ingresa un teléfono válido");
+      toast.error(
+        "Ingresa un teléfono válido"
+      );
       return;
     }
 
@@ -174,46 +361,114 @@ export default function ReservationModal({
 
     try {
       // ========================================================
-      // CALCULAR EXPIRACIÓN
+      // REFERENCIA DEL NÚMERO
       // ========================================================
 
-      const reservationExpiresAt =
-        Date.now() + RESERVATION_TIME_MS;
-
-      // ========================================================
-      // GUARDAR RESERVA EN FIRESTORE
-      // ========================================================
-
-      await updateDoc(
-        doc(
-          db,
-          "raffles",
-          raffleId,
-          "numbers",
-          number.id
-        ),
-        {
-          status: "reserved",
-          buyerName: cleanName,
-          buyerPhone: cleanPhone,
-          reservedAt: serverTimestamp(),
-
-          // Se guarda como timestamp de Firebase.
-          // Esto permite saber cuándo debería expirar.
-          reservationExpiresAt:
-            new Date(reservationExpiresAt),
-        }
+      const numberRef = doc(
+        db,
+        "raffles",
+        raffleId,
+        "numbers",
+        number.id
       );
 
       // ========================================================
-      // MOSTRAR PANTALLA DE RESERVA
+      // COMPROBAR ESTADO ACTUAL
+      //
+      // Evita reservar un número que ya fue reservado
+      // mientras el usuario tenía el modal abierto.
       // ========================================================
 
-      setExpiresAt(reservationExpiresAt);
-      setTimeLeft(RESERVATION_TIME_MS);
+      const currentSnapshot =
+        await getDoc(numberRef);
+
+      if (!currentSnapshot.exists()) {
+        toast.error(
+          "El número ya no existe."
+        );
+        return;
+      }
+
+      const currentData =
+        currentSnapshot.data();
+
+      // ========================================================
+      // SI YA ESTÁ RESERVADO
+      // ========================================================
+
+      if (
+        currentData.status === "reserved"
+      ) {
+        toast.error(
+          "Este número ya está reservado."
+        );
+        return;
+      }
+
+      // ========================================================
+      // CALCULAR EXPIRACIÓN
+      //
+      // ESTA FECHA SE GUARDA EN FIRESTORE.
+      //
+      // Por ejemplo:
+      //
+      // 10:00:00 -> reserva
+      // 10:30:00 -> expira
+      //
+      // Si el usuario cierra y abre el modal a las 10:10,
+      // verá 20:00 y NO 30:00.
+      // ========================================================
+
+      const reservationExpiresAt =
+        Date.now() +
+        RESERVATION_TIME_MS;
+
+      // ========================================================
+      // GUARDAR RESERVA
+      // ========================================================
+
+     await updateDoc(
+  doc(
+    db,
+    "raffles",
+    raffleId,
+    "numbers",
+    number.id
+  ),
+  {
+    status: "reserved",
+
+    buyerName: cleanName,
+    buyerPhone: cleanPhone,
+
+    // UID REAL DEL USUARIO DE FIREBASE
+    buyerUid: user.uid,
+
+    reservedAt: serverTimestamp(),
+
+    reservationExpiresAt: new Date(
+      reservationExpiresAt
+    ),
+  }
+);
+
+      // ========================================================
+      // ACTUALIZAR ESTADO LOCAL
+      // ========================================================
+
+      setExpiresAt(
+        reservationExpiresAt
+      );
+
+      setTimeLeft(
+        RESERVATION_TIME_MS
+      );
+
       setReserved(true);
 
-      toast.success("¡Número reservado correctamente!");
+      toast.success(
+        "¡Número reservado correctamente!"
+      );
     } catch (error) {
       console.error(
         "Error reservando número:",
@@ -237,6 +492,7 @@ export default function ReservationModal({
       toast.error(
         "El tiempo de reserva ha terminado."
       );
+
       return;
     }
 
@@ -268,7 +524,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
     const whatsappUrl =
       `https://wa.me/${ADMIN_WHATSAPP}?text=` +
-      encodeURIComponent(whatsappMessage);
+      encodeURIComponent(
+        whatsappMessage
+      );
 
     window.open(
       whatsappUrl,
@@ -759,225 +1017,218 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         src="/images/qr-breb1.png"
                         alt="Código QR para realizar el pago mediante Bre-B"
                         className="
-    h-72 w-72
-    object-contain
-    sm:h-80 sm:w-80
-  "
+                          h-72 w-72
+                          max-w-full
+                          object-contain
+                          sm:h-80 sm:w-80
+                        "
                       />
                     </div>
                   </div>
-{/* ========================================= */}
-{/* MÉTODOS DE PAGO */}
-{/* ========================================= */}
 
-<div className="space-y-3">
+                  {/* ========================================= */}
+                  {/* MÉTODOS DE PAGO */}
+                  {/* ========================================= */}
 
-  <div className="text-center">
-    <p className="text-xs font-bold text-white">
-      💳 También puedes pagar por transferencia
-    </p>
-    <p className="mt-1 text-[10px] text-slate-500">
-      Utiliza cualquiera de estas opciones para realizar el pago.
-    </p>
-  </div>
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-white">
+                        💳 También puedes pagar por transferencia
+                      </p>
 
-  {/* BANCOLombia + NEQUI */}
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Utiliza cualquiera de estas opciones para realizar el pago.
+                      </p>
+                    </div>
 
-    {/* BANCOLombia */}
-    <div
-      className="
-        rounded-xl
-        border border-yellow-500/20
-        bg-yellow-500/[0.05]
-        p-3.5
-        transition-colors
-        hover:border-yellow-500/30
-        hover:bg-yellow-500/[0.08]
-      "
-    >
-      <div className="flex items-center gap-2.5">
+                    {/* BANCOLombia + NEQUI */}
 
-        <div
-          className="
-            flex
-            h-9
-            w-9
-            shrink-0
-            items-center
-            justify-center
-            rounded-lg
-            border
-            border-yellow-500/20
-            bg-yellow-500/10
-            text-lg
-          "
-        >
-          🏦
-        </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {/* BANCOLombia */}
 
-        <div className="min-w-0">
-          <p
-            className="
-              text-[9px]
-              font-bold
-              uppercase
-              tracking-[0.12em]
-              text-yellow-400
-            "
-          >
-            Bancolombia
-          </p>
+                      <div
+                        className="
+                          rounded-xl
+                          border border-yellow-500/20
+                          bg-yellow-500/[0.05]
+                          p-3.5
+                          transition-colors
+                          hover:border-yellow-500/30
+                          hover:bg-yellow-500/[0.08]
+                        "
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="
+                              flex h-9 w-9 shrink-0
+                              items-center justify-center
+                              rounded-lg
+                              border border-yellow-500/20
+                              bg-yellow-500/10
+                              text-lg
+                            "
+                          >
+                            🏦
+                          </div>
 
-          <p className="mt-0.5 text-[10px] text-slate-500">
-            Cuenta de ahorros
-          </p>
-        </div>
+                          <div className="min-w-0">
+                            <p
+                              className="
+                                text-[9px]
+                                font-bold
+                                uppercase
+                                tracking-[0.12em]
+                                text-yellow-400
+                              "
+                            >
+                              Bancolombia
+                            </p>
 
-      </div>
+                            <p className="mt-0.5 text-[10px] text-slate-500">
+                              Cuenta de ahorros
+                            </p>
+                          </div>
+                        </div>
 
-      <div
-        className="
-          mt-3
-          rounded-lg
-          border border-white/[0.06]
-          bg-black/20
-          px-3
-          py-2.5
-          text-center
-        "
-      >
-        <p
-          className="
-            break-all
-            font-mono
-            text-sm
-            font-black
-            tracking-wider
-            text-white
-            sm:text-base
-          "
-        >
-          91255816182
-        </p>
-      </div>
+                        <div
+                          className="
+                            mt-3
+                            rounded-lg
+                            border border-white/[0.06]
+                            bg-black/20
+                            px-3 py-2.5
+                            text-center
+                          "
+                        >
+                          <p
+                            className="
+                              break-all
+                              font-mono
+                              text-sm
+                              font-black
+                              tracking-wider
+                              text-white
+                              sm:text-base
+                            "
+                          >
+                            91255816182
+                          </p>
+                        </div>
+                      </div>
 
-    </div>
+                      {/* NEQUI */}
 
-    {/* NEQUI */}
-    <div
-      className="
-        rounded-xl
-        border border-pink-500/20
-        bg-pink-500/[0.05]
-        p-3.5
-        transition-colors
-        hover:border-pink-500/30
-        hover:bg-pink-500/[0.08]
-      "
-    >
-      <div className="flex items-center gap-2.5">
+                      <div
+                        className="
+                          rounded-xl
+                          border border-pink-500/20
+                          bg-pink-500/[0.05]
+                          p-3.5
+                          transition-colors
+                          hover:border-pink-500/30
+                          hover:bg-pink-500/[0.08]
+                        "
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="
+                              flex h-9 w-9 shrink-0
+                              items-center justify-center
+                              rounded-lg
+                              border border-pink-500/20
+                              bg-pink-500/10
+                              text-lg
+                            "
+                          >
+                            📱
+                          </div>
 
-        <div
-          className="
-            flex
-            h-9
-            w-9
-            shrink-0
-            items-center
-            justify-center
-            rounded-lg
-            border
-            border-pink-500/20
-            bg-pink-500/10
-            text-lg
-          "
-        >
-          📱
-        </div>
+                          <div className="min-w-0">
+                            <p
+                              className="
+                                text-[9px]
+                                font-bold
+                                uppercase
+                                tracking-[0.12em]
+                                text-pink-400
+                              "
+                            >
+                              Nequi
+                            </p>
 
-        <div className="min-w-0">
-          <p
-            className="
-              text-[9px]
-              font-bold
-              uppercase
-              tracking-[0.12em]
-              text-pink-400
-            "
-          >
-            Nequi
-          </p>
+                            <p className="mt-0.5 text-[10px] text-slate-500">
+                              Número de celular
+                            </p>
+                          </div>
+                        </div>
 
-          <p className="mt-0.5 text-[10px] text-slate-500">
-            Número de celular
-          </p>
-        </div>
+                        <div
+                          className="
+                            mt-3
+                            rounded-lg
+                            border border-white/[0.06]
+                            bg-black/20
+                            px-3 py-2.5
+                            text-center
+                          "
+                        >
+                          <p
+                            className="
+                              break-all
+                              font-mono
+                              text-sm
+                              font-black
+                              tracking-wider
+                              text-white
+                              sm:text-base
+                            "
+                          >
+                            302 563 6290
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-      </div>
+                    {/* AVISO */}
 
-      <div
-        className="
-          mt-3
-          rounded-lg
-          border border-white/[0.06]
-          bg-black/20
-          px-3
-          py-2.5
-          text-center
-        "
-      >
-        <p
-          className="
-            break-all
-            font-mono
-            text-sm
-            font-black
-            tracking-wider
-            text-white
-            sm:text-base
-          "
-        >
-          302 563 6290
-        </p>
-      </div>
+                    <div
+                      className="
+                        flex items-start gap-2.5
+                        rounded-xl
+                        border border-violet-500/15
+                        bg-violet-500/[0.05]
+                        px-3.5 py-3
+                      "
+                    >
+                      <span className="mt-0.5 shrink-0 text-sm">
+                        💡
+                      </span>
 
-    </div>
+                      <p
+                        className="
+                          text-[10.5px]
+                          leading-[1.5]
+                          text-slate-400
+                        "
+                      >
+                        Puedes pagar mediante{" "}
+                        <span className="font-semibold text-yellow-300">
+                          Bancolombia
+                        </span>
+                        ,{" "}
+                        <span className="font-semibold text-pink-300">
+                          Nequi
+                        </span>{" "}
+                        o escaneando el código QR de{" "}
+                        <span className="font-semibold text-white">
+                          Bre-B
+                        </span>
+                        . Después de realizar el pago,
+                        envía el comprobante por WhatsApp.
+                      </p>
+                    </div>
+                  </div>
 
-  </div>
-
-  {/* AVISO */}
-  <div
-    className="
-      flex
-      items-start
-      gap-2.5
-      rounded-xl
-      border border-violet-500/15
-      bg-violet-500/[0.05]
-      px-3.5
-      py-3
-    "
-  >
-    <span className="mt-0.5 shrink-0 text-sm">
-      💡
-    </span>
-
-    <p
-      className="
-        text-[10.5px]
-        leading-[1.5]
-        text-slate-400
-      "
-    >
-      Puedes pagar mediante <span className="font-semibold text-yellow-300">Bancolombia</span>,
-      <span className="font-semibold text-pink-300"> Nequi</span> o escaneando
-      el código QR de <span className="font-semibold text-white">Bre-B</span>.
-      Después de realizar el pago, envía el comprobante por WhatsApp.
-    </p>
-  </div>
-
-</div>
                   {/* ================================================== */}
                   {/* AVISO */}
                   {/* ================================================== */}
@@ -1274,10 +1525,14 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       placeholder="Ej. Juan Pérez"
                       value={name}
                       onChange={(e) =>
-                        setName(e.target.value)
+                        setName(
+                          e.target.value
+                        )
                       }
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (
+                          e.key === "Enter"
+                        ) {
                           handleSubmit();
                         }
                       }}
@@ -1346,10 +1601,14 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       placeholder="Ej. 300 123 4567"
                       value={phone}
                       onChange={(e) =>
-                        setPhone(e.target.value)
+                        setPhone(
+                          e.target.value
+                        )
                       }
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (
+                          e.key === "Enter"
+                        ) {
                           handleSubmit();
                         }
                       }}
@@ -1588,3 +1847,4 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
     </div>
   );
 }
+
