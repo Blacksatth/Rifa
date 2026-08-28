@@ -756,17 +756,228 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       "
                     >
                       <img
-  src="/images/qr-breb1.png"
-  alt="Código QR para realizar el pago mediante Bre-B"
-  className="
+                        src="/images/qr-breb1.png"
+                        alt="Código QR para realizar el pago mediante Bre-B"
+                        className="
     h-72 w-72
     object-contain
     sm:h-80 sm:w-80
   "
-/>
+                      />
                     </div>
                   </div>
+{/* ========================================= */}
+{/* MÉTODOS DE PAGO */}
+{/* ========================================= */}
 
+<div className="space-y-3">
+
+  <div className="text-center">
+    <p className="text-xs font-bold text-white">
+      💳 También puedes pagar por transferencia
+    </p>
+    <p className="mt-1 text-[10px] text-slate-500">
+      Utiliza cualquiera de estas opciones para realizar el pago.
+    </p>
+  </div>
+
+  {/* BANCOLombia + NEQUI */}
+  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+    {/* BANCOLombia */}
+    <div
+      className="
+        rounded-xl
+        border border-yellow-500/20
+        bg-yellow-500/[0.05]
+        p-3.5
+        transition-colors
+        hover:border-yellow-500/30
+        hover:bg-yellow-500/[0.08]
+      "
+    >
+      <div className="flex items-center gap-2.5">
+
+        <div
+          className="
+            flex
+            h-9
+            w-9
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            border
+            border-yellow-500/20
+            bg-yellow-500/10
+            text-lg
+          "
+        >
+          🏦
+        </div>
+
+        <div className="min-w-0">
+          <p
+            className="
+              text-[9px]
+              font-bold
+              uppercase
+              tracking-[0.12em]
+              text-yellow-400
+            "
+          >
+            Bancolombia
+          </p>
+
+          <p className="mt-0.5 text-[10px] text-slate-500">
+            Cuenta de ahorros
+          </p>
+        </div>
+
+      </div>
+
+      <div
+        className="
+          mt-3
+          rounded-lg
+          border border-white/[0.06]
+          bg-black/20
+          px-3
+          py-2.5
+          text-center
+        "
+      >
+        <p
+          className="
+            break-all
+            font-mono
+            text-sm
+            font-black
+            tracking-wider
+            text-white
+            sm:text-base
+          "
+        >
+          91255816182
+        </p>
+      </div>
+
+    </div>
+
+    {/* NEQUI */}
+    <div
+      className="
+        rounded-xl
+        border border-pink-500/20
+        bg-pink-500/[0.05]
+        p-3.5
+        transition-colors
+        hover:border-pink-500/30
+        hover:bg-pink-500/[0.08]
+      "
+    >
+      <div className="flex items-center gap-2.5">
+
+        <div
+          className="
+            flex
+            h-9
+            w-9
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            border
+            border-pink-500/20
+            bg-pink-500/10
+            text-lg
+          "
+        >
+          📱
+        </div>
+
+        <div className="min-w-0">
+          <p
+            className="
+              text-[9px]
+              font-bold
+              uppercase
+              tracking-[0.12em]
+              text-pink-400
+            "
+          >
+            Nequi
+          </p>
+
+          <p className="mt-0.5 text-[10px] text-slate-500">
+            Número de celular
+          </p>
+        </div>
+
+      </div>
+
+      <div
+        className="
+          mt-3
+          rounded-lg
+          border border-white/[0.06]
+          bg-black/20
+          px-3
+          py-2.5
+          text-center
+        "
+      >
+        <p
+          className="
+            break-all
+            font-mono
+            text-sm
+            font-black
+            tracking-wider
+            text-white
+            sm:text-base
+          "
+        >
+          302 563 6290
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* AVISO */}
+  <div
+    className="
+      flex
+      items-start
+      gap-2.5
+      rounded-xl
+      border border-violet-500/15
+      bg-violet-500/[0.05]
+      px-3.5
+      py-3
+    "
+  >
+    <span className="mt-0.5 shrink-0 text-sm">
+      💡
+    </span>
+
+    <p
+      className="
+        text-[10.5px]
+        leading-[1.5]
+        text-slate-400
+      "
+    >
+      Puedes pagar mediante <span className="font-semibold text-yellow-300">Bancolombia</span>,
+      <span className="font-semibold text-pink-300"> Nequi</span> o escaneando
+      el código QR de <span className="font-semibold text-white">Bre-B</span>.
+      Después de realizar el pago, envía el comprobante por WhatsApp.
+    </p>
+  </div>
+
+</div>
                   {/* ================================================== */}
                   {/* AVISO */}
                   {/* ================================================== */}
