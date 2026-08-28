@@ -20,10 +20,17 @@ export interface Raffle {
 export interface RaffleNumber {
   id: string;
   number: string;
-  status: "available" | "reserved" | "sold";
+
+  status:
+    | "available"
+    | "reserved"
+    | "sold";
+
   buyerName: string | null;
   buyerPhone: string | null;
-  buyerUid?: string | null;
+
+  // Identificador del visitante
+  buyerVisitorId?: string | null;
 
   reservedAt?: unknown;
   reservationExpiresAt?: unknown;

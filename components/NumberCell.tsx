@@ -1,9 +1,11 @@
 "use client";
 
-import { RaffleNumber } from "@/lib/types";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
+import { RaffleNumber } from "@/lib/types";
+import {
+  getVisitorId,
+  isReservationMine,
+} from "@/lib/reservations";
 
 type NumberStatus =
   | "available"
@@ -67,30 +69,24 @@ export default function NumberCell({
   onClick,
 }: NumberCellProps) {
   // ============================================================
-  // USUARIO ACTUAL DE FIREBASE
+  // VISITOR ID
   // ============================================================
 
-  const [currentUserUid, setCurrentUserUid] = useState<
-    string | null
-  >(auth.currentUser?.uid ?? null);
+  const [visitorId, setVisitorId] =
+    useState<string | null>(null);
 
   // ============================================================
-  // ESCUCHAR SESIÓN DE FIREBASE
+  // OBTENER VISITOR ID
   // ============================================================
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (user) => {
-        setCurrentUserUid(user?.uid ?? null);
-      }
-    );
+    const id = getVisitorId();
 
-    return () => unsubscribe();
+    setVisitorId(id);
   }, []);
 
   // ============================================================
-  // ESTADO DEL NÚMERO
+  // ESTADO
   // ============================================================
 
   const status: NumberStatus =
@@ -101,43 +97,28 @@ export default function NumberCell({
       : "sold";
 
   // ============================================================
-  // ¿ESTE NÚMERO ES MÍO?
-  //
-  // IMPORTANTE:
-  //
-  // Ya NO usamos localStorage.
-  //
-  // Firestore:
-  // buyerUid = UID del usuario que hizo la reserva
-  //
-  // Firebase Auth:
-  // currentUserUid = UID del usuario actualmente conectado
-  //
-  // Si coinciden => la reserva es del usuario.
+  // ¿ES MI RESERVA?
   // ============================================================
 
   const mine =
     status === "reserved" &&
-    !!currentUserUid &&
-    !!data.buyerUid &&
-    data.buyerUid === currentUserUid;
+    isReservationMine(
+      data,
+      visitorId
+    );
 
   // ============================================================
   // ESTILOS
   // ============================================================
 
-  const styles = STATUS_STYLES[status];
+  const styles =
+    STATUS_STYLES[status];
 
   const isAvailable =
     status === "available";
 
   // ============================================================
-  // ¿SE PUEDE ABRIR?
-  //
-  // Disponible = sí
-  // Mi reserva = sí
-  // Reserva de otro usuario = no
-  // Vendido = no
+  // PUEDE ABRIR
   // ============================================================
 
   const canOpen =
@@ -175,31 +156,13 @@ export default function NumberCell({
   return (
     <button
       type="button"
-
-      /*
-       * Disponible:
-       * puede abrirse.
-       *
-       * Mi reserva:
-       * puede abrirse nuevamente.
-       *
-       * Reserva de otro usuario:
-       * bloqueada.
-       *
-       * Vendido:
-       * bloqueado.
-       */
-
       disabled={!canOpen}
-
       onClick={
         canOpen
           ? onClick
           : undefined
       }
-
       aria-label={`Número ${data.number}: ${label}`}
-
       title={
         isAvailable
           ? `Seleccionar número ${data.number}`
@@ -207,7 +170,6 @@ export default function NumberCell({
             ? `Abrir tu reserva: ${data.number}`
             : styles.label
       }
-
       className={`
         group
         relative
@@ -257,54 +219,38 @@ export default function NumberCell({
         <span
           className="
             pointer-events-none
-
             absolute
-
             -right-5
             -top-5
-
             h-14
             w-14
-
             rounded-full
-
             bg-emerald-400/10
-
             blur-xl
-
             opacity-0
-
             transition-opacity
             duration-300
-
             group-hover:opacity-100
           "
         />
       )}
 
       {/* ========================================= */}
-      {/* GLOW DE MI RESERVA */}
+      {/* GLOW MI RESERVA */}
       {/* ========================================= */}
 
       {mine && (
         <span
           className="
             pointer-events-none
-
             absolute
-
             -right-5
             -top-5
-
             h-14
             w-14
-
             rounded-full
-
             bg-sky-400/10
-
             blur-xl
-
             opacity-100
           "
         />
@@ -315,17 +261,13 @@ export default function NumberCell({
       {/* ========================================= */}
 
       <span className="relative flex items-center gap-2">
-        {/* ========================================= */}
-        {/* STATUS DOT */}
-        {/* ========================================= */}
+        {/* DOT */}
 
         <span
           className={`
             h-1.5
             w-1.5
-
             shrink-0
-
             rounded-full
 
             ${
@@ -348,16 +290,12 @@ export default function NumberCell({
           `}
         />
 
-        {/* ========================================= */}
         {/* NUMBER */}
-        {/* ========================================= */}
 
         <span
           className={`
             text-sm
-
             font-bold
-
             tracking-wide
 
             transition-transform
@@ -387,15 +325,10 @@ export default function NumberCell({
       <span
         className={`
           relative
-
           mt-1
-
           text-[9px]
-
           font-semibold
-
           uppercase
-
           tracking-wider
 
           ${
@@ -416,24 +349,15 @@ export default function NumberCell({
         <span
           className="
             absolute
-
             bottom-0
-
             left-1/2
-
             h-[2px]
-
             w-0
-
             -translate-x-1/2
-
             rounded-full
-
             bg-emerald-400
-
             transition-all
             duration-300
-
             group-hover:w-1/2
           "
         />
@@ -447,18 +371,12 @@ export default function NumberCell({
         <span
           className="
             absolute
-
             bottom-0
             left-1/2
-
             h-[2px]
-
             w-1/2
-
             -translate-x-1/2
-
             rounded-full
-
             bg-sky-400
           "
         />

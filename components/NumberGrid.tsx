@@ -1,5 +1,3 @@
-// NumberGrid.tsx
-
 "use client";
 
 import { RaffleNumber } from "@/lib/types";
@@ -12,10 +10,15 @@ export default function NumberGrid({
   numbers: RaffleNumber[];
   onSelect: (n: RaffleNumber) => void;
 }) {
-  const sortedNumbers = [...numbers].sort((a, b) =>
-    a.number.localeCompare(b.number, undefined, {
-      numeric: true,
-    })
+  const sortedNumbers = [...numbers].sort(
+    (a, b) =>
+      a.number.localeCompare(
+        b.number,
+        undefined,
+        {
+          numeric: true,
+        }
+      )
   );
 
   return (

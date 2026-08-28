@@ -9,28 +9,30 @@ import {
   Timestamp,
 } from "firebase/firestore";
 
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
+import {
+  getVisitorId,
+} from "@/lib/reservations";
 import toast from "react-hot-toast";
 
 // ============================================================
 // WHATSAPP DEL ADMINISTRADOR
-// Colombia = 57
-//
-// SIN +, SIN ESPACIOS Y SIN GUIONES
 // ============================================================
 
-const ADMIN_WHATSAPP = "573025636290";
+const ADMIN_WHATSAPP =
+  "573025636290";
 
 // ============================================================
 // TIEMPO DE RESERVA
-// 30 MINUTOS
 // ============================================================
 
 const RESERVATION_TIME_MINUTES = 30;
 
 const RESERVATION_TIME_MS =
-  RESERVATION_TIME_MINUTES * 60 * 1000;
+  RESERVATION_TIME_MINUTES *
+  60 *
+  1000;
 
 export default function ReservationModal({
   raffleId,
@@ -43,40 +45,35 @@ export default function ReservationModal({
   number: RaffleNumber;
   onClose: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [phone, setPhone] =
+    useState("");
 
-  // ============================================================
-  // INDICA SI LA RESERVA PERTENECE AL USUARIO ACTUAL
-  // ============================================================
+  const [loading, setLoading] =
+    useState(false);
 
-  const [reserved, setReserved] = useState(false);
-
-  // ============================================================
-  // HORA EXACTA EN LA QUE TERMINA LA RESERVA
-  // ============================================================
+  const [reserved, setReserved] =
+    useState(false);
 
   const [expiresAt, setExpiresAt] =
     useState<number | null>(null);
 
-  // ============================================================
-  // TIEMPO RESTANTE
-  // ============================================================
-
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] =
+    useState(0);
 
   // ============================================================
-  // INFORMACIÓN DE LA RIFA
+  // INFORMACIÓN RIFA
   // ============================================================
 
-  const raffleData = raffle as Raffle & {
-    name?: string;
-    title?: string;
-    price?: number;
-    ticketPrice?: number;
-  };
+  const raffleData =
+    raffle as Raffle & {
+      name?: string;
+      title?: string;
+      price?: number;
+      ticketPrice?: number;
+    };
 
   const raffleName =
     raffleData.name ||
@@ -89,64 +86,58 @@ export default function ReservationModal({
     null;
 
   // ============================================================
-  // FORMATEAR PRECIO
+  // PRECIO
   // ============================================================
 
-  function formatPrice(price: number | null) {
+  function formatPrice(
+    price: number | null
+  ) {
     if (price === null) {
       return "Consultar precio";
     }
 
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      maximumFractionDigits: 0,
-    }).format(price);
+    return new Intl.NumberFormat(
+      "es-CO",
+      {
+        style: "currency",
+        currency: "COP",
+        maximumFractionDigits: 0,
+      }
+    ).format(price);
   }
 
   // ============================================================
-  // FORMATEAR TIEMPO
+  // TIEMPO
   // ============================================================
 
-  function formatTime(milliseconds: number) {
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(milliseconds / 1000)
-    );
+  function formatTime(
+    milliseconds: number
+  ) {
+    const totalSeconds =
+      Math.max(
+        0,
+        Math.floor(
+          milliseconds / 1000
+        )
+      );
 
-    const minutes = Math.floor(
-      totalSeconds / 60
-    );
+    const minutes =
+      Math.floor(
+        totalSeconds / 60
+      );
 
-    const seconds = totalSeconds % 60;
+    const seconds =
+      totalSeconds % 60;
 
-    return `${String(minutes).padStart(
-      2,
-      "0"
-    )}:${String(seconds).padStart(2, "0")}`;
+    return `${String(
+      minutes
+    ).padStart(2, "0")}:${String(
+      seconds
+    ).padStart(2, "0")}`;
   }
 
   // ============================================================
-  // CARGAR RESERVA DESDE FIRESTORE
-  //
-  // IMPORTANTE:
-  //
-  // NO usamos localStorage.
-  //
-  // La reserva se identifica mediante:
-  //
-  // buyerUid === auth.currentUser.uid
-  //
-  // De esta forma funciona:
-  //
-  // - Localhost
-  // - Vercel
-  // - Otro computador
-  // - Otro navegador
-  // - Celular
-  //
-  // Siempre que el usuario inicie sesión con
-  // la misma cuenta de Firebase.
+  // CARGAR RESERVA
   // ============================================================
 
   useEffect(() => {
@@ -154,33 +145,21 @@ export default function ReservationModal({
 
     async function loadExistingReservation() {
       try {
-        // ======================================================
-        // OBTENER USUARIO ACTUAL
-        // ======================================================
+        const visitorId =
+          getVisitorId();
 
-        const user = auth.currentUser;
-
-        if (!user) {
-          if (mounted) {
-            setReserved(false);
-            setExpiresAt(null);
-            setTimeLeft(0);
-          }
-
+        if (!visitorId) {
           return;
         }
 
-        // ======================================================
-        // REFERENCIA DEL NÚMERO
-        // ======================================================
-
-        const numberRef = doc(
-          db,
-          "raffles",
-          raffleId,
-          "numbers",
-          number.id
-        );
+        const numberRef =
+          doc(
+            db,
+            "raffles",
+            raffleId,
+            "numbers",
+            number.id
+          );
 
         const snapshot =
           await getDoc(numberRef);
@@ -189,13 +168,20 @@ export default function ReservationModal({
           return;
         }
 
-        const data = snapshot.data();
+        const data =
+          snapshot.data();
 
         // ======================================================
-        // EL NÚMERO NO ESTÁ RESERVADO
+        // SOLO MOSTRAR COMO "TU RESERVA"
+        // SI EL VISITOR ID COINCIDE
         // ======================================================
 
-        if (data.status !== "reserved") {
+        if (
+          data.status !==
+            "reserved" ||
+          data.buyerVisitorId !==
+            visitorId
+        ) {
           if (mounted) {
             setReserved(false);
             setExpiresAt(null);
@@ -206,52 +192,29 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // VERIFICAR DUEÑO DE LA RESERVA
-        //
-        // ESTA ES LA PARTE MÁS IMPORTANTE.
-        //
-        // Solamente el usuario que tiene el mismo UID
-        // puede recuperar la reserva.
+        // EXPIRACIÓN
         // ======================================================
 
-        if (data.buyerUid !== user.uid) {
-          if (mounted) {
-            setReserved(false);
-            setExpiresAt(null);
-            setTimeLeft(0);
-          }
-
-          return;
-        }
-
-        // ======================================================
-        // OBTENER FECHA DE EXPIRACIÓN
-        // ======================================================
-
-        let expirationTime: number | null =
-          null;
+        let expirationTime:
+          | number
+          | null = null;
 
         const storedExpiration =
           data.reservationExpiresAt;
 
-        // Firebase Timestamp
         if (
-          storedExpiration instanceof Timestamp
+          storedExpiration instanceof
+          Timestamp
         ) {
           expirationTime =
             storedExpiration.toMillis();
-        }
-
-        // Date
-        else if (
-          storedExpiration instanceof Date
+        } else if (
+          storedExpiration instanceof
+          Date
         ) {
           expirationTime =
             storedExpiration.getTime();
-        }
-
-        // Timestamp-like
-        else if (
+        } else if (
           storedExpiration &&
           typeof storedExpiration.toMillis ===
             "function"
@@ -261,14 +224,10 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // NO EXISTE FECHA DE EXPIRACIÓN
+        // SIN FECHA
         // ======================================================
 
         if (!expirationTime) {
-          console.warn(
-            "La reserva existe pero no tiene reservationExpiresAt"
-          );
-
           if (mounted) {
             setReserved(true);
             setExpiresAt(null);
@@ -279,36 +238,31 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // CALCULAR TIEMPO RESTANTE
+        // TIEMPO RESTANTE
         // ======================================================
 
         const remaining =
-          expirationTime - Date.now();
+          expirationTime -
+          Date.now();
 
         // ======================================================
-        // RESERVA EXPIRADA
+        // EXPIRADA
         // ======================================================
 
         if (remaining <= 0) {
           if (mounted) {
             setReserved(true);
-            setExpiresAt(expirationTime);
+            setExpiresAt(
+              expirationTime
+            );
             setTimeLeft(0);
-
-            if (data.buyerName) {
-              setName(data.buyerName);
-            }
-
-            if (data.buyerPhone) {
-              setPhone(data.buyerPhone);
-            }
           }
 
           return;
         }
 
         // ======================================================
-        // RESERVA ACTIVA
+        // ACTIVA
         // ======================================================
 
         if (mounted) {
@@ -318,16 +272,20 @@ export default function ReservationModal({
             expirationTime
           );
 
-          setTimeLeft(remaining);
+          setTimeLeft(
+            remaining
+          );
 
-          // Recuperar nombre
           if (data.buyerName) {
-            setName(data.buyerName);
+            setName(
+              data.buyerName
+            );
           }
 
-          // Recuperar teléfono
           if (data.buyerPhone) {
-            setPhone(data.buyerPhone);
+            setPhone(
+              data.buyerPhone
+            );
           }
         }
       } catch (error) {
@@ -343,27 +301,26 @@ export default function ReservationModal({
     return () => {
       mounted = false;
     };
-  }, [raffleId, number.id]);
+  }, [
+    raffleId,
+    number.id,
+  ]);
 
   // ============================================================
   // CONTADOR
-  //
-  // SIEMPRE SE CALCULA CON expiresAt.
-  //
-  // NO vuelve a 30:00 al cerrar y abrir.
   // ============================================================
 
   useEffect(() => {
-    if (!reserved || !expiresAt) {
+    if (
+      !reserved ||
+      !expiresAt
+    ) {
       return;
     }
 
-    // ==========================================================
-    // CALCULAR INMEDIATAMENTE
-    // ==========================================================
-
     const initialRemaining =
-      expiresAt - Date.now();
+      expiresAt -
+      Date.now();
 
     setTimeLeft(
       Math.max(
@@ -372,105 +329,100 @@ export default function ReservationModal({
       )
     );
 
-    // ==========================================================
-    // YA EXPIRÓ
-    // ==========================================================
-
-    if (initialRemaining <= 0) {
+    if (
+      initialRemaining <= 0
+    ) {
       return;
     }
 
-    // ==========================================================
-    // ACTUALIZAR CADA SEGUNDO
-    // ==========================================================
+    const interval =
+      setInterval(() => {
+        const remaining =
+          expiresAt -
+          Date.now();
 
-    const interval = setInterval(() => {
-      const remaining =
-        expiresAt - Date.now();
+        if (remaining <= 0) {
+          setTimeLeft(0);
 
-      if (remaining <= 0) {
-        setTimeLeft(0);
+          clearInterval(
+            interval
+          );
 
-        clearInterval(interval);
+          return;
+        }
 
-        return;
-      }
-
-      setTimeLeft(remaining);
-    }, 1000);
+        setTimeLeft(
+          remaining
+        );
+      }, 1000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [reserved, expiresAt]);
+  }, [
+    reserved,
+    expiresAt,
+  ]);
 
   // ============================================================
-  // RESERVAR NÚMERO
+  // RESERVAR
   // ============================================================
 
   async function handleSubmit() {
-    const cleanName = name.trim();
-    const cleanPhone = phone.trim();
+    const cleanName =
+      name.trim();
 
-    // ==========================================================
-    // USUARIO DE FIREBASE
-    // ==========================================================
+    const cleanPhone =
+      phone.trim();
 
-    const user = auth.currentUser;
-
-    if (!user) {
-      toast.error(
-        "Debes iniciar sesión para reservar un número."
-      );
-
+    if (loading) {
       return;
     }
-
-    // ==========================================================
-    // VALIDAR NOMBRE
-    // ==========================================================
 
     if (!cleanName) {
       toast.error(
         "Ingresa tu nombre completo"
       );
-
       return;
     }
 
-    if (cleanName.length < 3) {
+    if (
+      cleanName.length < 3
+    ) {
       toast.error(
         "El nombre debe tener al menos 3 caracteres"
       );
-
       return;
     }
-
-    // ==========================================================
-    // VALIDAR TELÉFONO
-    // ==========================================================
 
     if (!cleanPhone) {
       toast.error(
         "Ingresa tu número de teléfono"
       );
-
       return;
     }
 
-    if (cleanPhone.length < 7) {
+    if (
+      cleanPhone.length < 7
+    ) {
       toast.error(
         "Ingresa un teléfono válido"
       );
-
       return;
     }
 
-    // ==========================================================
-    // EVITAR DOBLE CLIC
-    // ==========================================================
+    // ========================================================
+    // VISITOR ID
+    // ========================================================
 
-    if (loading) {
+    const visitorId =
+      getVisitorId();
+
+    if (!visitorId) {
+      toast.error(
+        "No se pudo identificar tu navegador. Recarga la página e intenta nuevamente."
+      );
+
       return;
     }
 
@@ -478,25 +430,28 @@ export default function ReservationModal({
 
     try {
       // ========================================================
-      // REFERENCIA DEL NÚMERO
+      // REFERENCIA
       // ========================================================
 
-      const numberRef = doc(
-        db,
-        "raffles",
-        raffleId,
-        "numbers",
-        number.id
-      );
+      const numberRef =
+        doc(
+          db,
+          "raffles",
+          raffleId,
+          "numbers",
+          number.id
+        );
 
       // ========================================================
-      // COMPROBAR ESTADO ACTUAL
+      // COMPROBAR ESTADO
       // ========================================================
 
       const currentSnapshot =
         await getDoc(numberRef);
 
-      if (!currentSnapshot.exists()) {
+      if (
+        !currentSnapshot.exists()
+      ) {
         toast.error(
           "El número ya no existe."
         );
@@ -508,11 +463,12 @@ export default function ReservationModal({
         currentSnapshot.data();
 
       // ========================================================
-      // SI YA ESTÁ RESERVADO
+      // YA ESTÁ RESERVADO
       // ========================================================
 
       if (
-        currentData.status === "reserved"
+        currentData.status ===
+        "reserved"
       ) {
         toast.error(
           "Este número ya está reservado."
@@ -522,11 +478,12 @@ export default function ReservationModal({
       }
 
       // ========================================================
-      // SI YA ESTÁ VENDIDO
+      // YA ESTÁ VENDIDO
       // ========================================================
 
       if (
-        currentData.status === "sold"
+        currentData.status ===
+        "sold"
       ) {
         toast.error(
           "Este número ya fue vendido."
@@ -536,21 +493,7 @@ export default function ReservationModal({
       }
 
       // ========================================================
-      // CALCULAR EXPIRACIÓN
-      //
-      // IMPORTANTE:
-      //
-      // La fecha se calcula una sola vez y se guarda
-      // en Firestore.
-      //
-      // Ejemplo:
-      //
-      // 10:00:00 -> reserva
-      // 10:30:00 -> expiración
-      //
-      // Si vuelve a abrir a las 10:15:
-      //
-      // 10:30 - 10:15 = 15 minutos
+      // EXPIRACIÓN
       // ========================================================
 
       const reservationExpiresAt =
@@ -558,7 +501,7 @@ export default function ReservationModal({
         RESERVATION_TIME_MS;
 
       // ========================================================
-      // GUARDAR RESERVA
+      // GUARDAR
       // ========================================================
 
       await updateDoc(
@@ -566,26 +509,21 @@ export default function ReservationModal({
         {
           status: "reserved",
 
-          buyerName: cleanName,
+          buyerName:
+            cleanName,
 
-          buyerPhone: cleanPhone,
-
-          // ====================================================
-          // UID DEL USUARIO DE FIREBASE
-          // ====================================================
-
-          buyerUid: user.uid,
+          buyerPhone:
+            cleanPhone,
 
           // ====================================================
-          // FECHA DE RESERVA
+          // IDENTIFICADOR DEL VISITANTE
           // ====================================================
+
+          buyerVisitorId:
+            visitorId,
 
           reservedAt:
             serverTimestamp(),
-
-          // ====================================================
-          // FECHA DE EXPIRACIÓN
-          // ====================================================
 
           reservationExpiresAt:
             new Date(
@@ -595,7 +533,7 @@ export default function ReservationModal({
       );
 
       // ========================================================
-      // ACTUALIZAR ESTADO LOCAL
+      // ACTUALIZAR UI
       // ========================================================
 
       setExpiresAt(
@@ -678,7 +616,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   }
 
   // ============================================================
-  // CERRAR MODAL
+  // CERRAR
   // ============================================================
 
   function handleClose() {
@@ -690,14 +628,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   }
 
   // ============================================================
-  // CLICK OVERLAY
+  // OVERLAY
   // ============================================================
 
   function handleOverlayClick(
     e: React.MouseEvent<HTMLDivElement>
   ) {
     if (
-      e.target === e.currentTarget &&
+      e.target ===
+        e.currentTarget &&
       !loading
     ) {
       onClose();
@@ -705,7 +644,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   }
 
   // ============================================================
-  // RESERVA EXPIRADA
+  // EXPIRADA
   // ============================================================
 
   const reservationExpired =
@@ -720,12 +659,18 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   return (
     <div
       className="
-        fixed inset-0 z-50 flex items-center justify-center
-        bg-black/70 p-3 backdrop-blur-sm
-        animate-in fade-in duration-200
+        fixed inset-0 z-50
+        flex items-center justify-center
+        bg-black/70
+        p-3
+        backdrop-blur-sm
+        animate-in fade-in
+        duration-200
         sm:p-4
       "
-      onMouseDown={handleOverlayClick}
+      onMouseDown={
+        handleOverlayClick
+      }
     >
       <style>{`
         .no-scrollbar::-webkit-scrollbar {
@@ -744,31 +689,50 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
       <div
         className="
-          relative flex w-full max-w-[420px]
-          flex-col overflow-hidden rounded-2xl
-          border border-white/10
+          relative
+          flex
+          w-full
+          max-w-[420px]
+          flex-col
+          overflow-hidden
+          rounded-2xl
+          border
+          border-white/10
           bg-[#0b0e1a]
-          shadow-2xl shadow-black/50
-          animate-in zoom-in-95 duration-200
+          shadow-2xl
+          shadow-black/50
+          animate-in
+          zoom-in-95
+          duration-200
           max-h-[calc(100dvh-24px)]
         "
       >
-        {/* Acabado */}
+        {/* GLOW */}
 
         <div
           className="
-            pointer-events-none absolute
-            -right-24 -top-24 h-56 w-56
-            rounded-full bg-violet-600/10
+            pointer-events-none
+            absolute
+            -right-24
+            -top-24
+            h-56
+            w-56
+            rounded-full
+            bg-violet-600/10
             blur-[80px]
           "
         />
 
         <div
           className="
-            pointer-events-none absolute
-            -bottom-24 -left-24 h-56 w-56
-            rounded-full bg-blue-600/10
+            pointer-events-none
+            absolute
+            -bottom-24
+            -left-24
+            h-56
+            w-56
+            rounded-full
+            bg-blue-600/10
             blur-[80px]
           "
         />
@@ -779,25 +743,48 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
         <div
           className="
-            relative flex shrink-0 items-center
-            justify-between gap-3
-            border-b border-white/[0.06]
-            px-4 py-3.5
+            relative
+            flex
+            shrink-0
+            items-center
+            justify-between
+            gap-3
+            border-b
+            border-white/[0.06]
+            px-4
+            py-3.5
             sm:px-5
           "
         >
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div
+            className="
+              flex
+              min-w-0
+              items-center
+              gap-2.5
+            "
+          >
             <div
               className="
-                flex h-9 w-9 shrink-0 items-center
-                justify-center rounded-lg
-                border border-violet-500/20
+                flex
+                h-9
+                w-9
+                shrink-0
+                items-center
+                justify-center
+                rounded-lg
+                border
+                border-violet-500/20
                 bg-violet-500/10
               "
             >
               {reserved ? (
                 <svg
-                  className="h-4.5 w-4.5 text-emerald-400"
+                  className="
+                    h-4.5
+                    w-4.5
+                    text-emerald-400
+                  "
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -811,7 +798,11 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </svg>
               ) : (
                 <svg
-                  className="h-4.5 w-4.5 text-violet-400"
+                  className="
+                    h-4.5
+                    w-4.5
+                    text-violet-400
+                  "
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -829,8 +820,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
             <div className="min-w-0">
               <p
                 className="
-                  text-[10px] font-semibold
-                  uppercase tracking-[0.14em]
+                  text-[10px]
+                  font-semibold
+                  uppercase
+                  tracking-[0.14em]
                   text-violet-400/90
                 "
               >
@@ -841,9 +834,12 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
               <h2
                 className="
-                  truncate text-[15px]
-                  font-bold leading-tight
-                  text-white sm:text-base
+                  truncate
+                  text-[15px]
+                  font-bold
+                  leading-tight
+                  text-white
+                  sm:text-base
                 "
               >
                 {reserved
@@ -859,13 +855,19 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
             onClick={handleClose}
             aria-label="Cerrar"
             className="
-              flex h-8 w-8 shrink-0
-              items-center justify-center
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
               rounded-lg
-              border border-white/[0.06]
+              border
+              border-white/[0.06]
               bg-white/[0.03]
               text-slate-500
-              transition-colors duration-150
+              transition-colors
+              duration-150
               hover:border-white/10
               hover:bg-white/[0.07]
               hover:text-white
@@ -895,38 +897,51 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
         <div
           className="
-            no-scrollbar relative min-h-0
-            flex-1 space-y-4 overflow-y-auto
-            p-4 sm:p-5
+            no-scrollbar
+            relative
+            min-h-0
+            flex-1
+            space-y-4
+            overflow-y-auto
+            p-4
+            sm:p-5
           "
         >
-          {/* ================================================== */}
-          {/* DESPUÉS DE RESERVAR */}
-          {/* ================================================== */}
-
           {reserved ? (
             <>
               {/* ÉXITO */}
 
               <div
                 className="
-                  rounded-2xl border
+                  rounded-2xl
+                  border
                   border-emerald-500/20
                   bg-emerald-500/[0.06]
-                  p-4 text-center
+                  p-4
+                  text-center
                 "
               >
                 <div
                   className="
-                    mx-auto mb-3 flex h-12 w-12
-                    items-center justify-center
+                    mx-auto
+                    mb-3
+                    flex
+                    h-12
+                    w-12
+                    items-center
+                    justify-center
                     rounded-full
-                    border border-emerald-500/30
+                    border
+                    border-emerald-500/30
                     bg-emerald-500/10
                   "
                 >
                   <svg
-                    className="h-6 w-6 text-emerald-400"
+                    className="
+                      h-6
+                      w-6
+                      text-emerald-400
+                    "
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -942,7 +957,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                 <h3
                   className="
-                    text-lg font-black
+                    text-lg
+                    font-black
                     text-white
                   "
                 >
@@ -953,8 +969,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                 <p
                   className="
-                    mt-1 text-xs
-                    leading-5 text-slate-400
+                    mt-1
+                    text-xs
+                    leading-5
+                    text-slate-400
                   "
                 >
                   {reservationExpired
@@ -963,16 +981,19 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </p>
               </div>
 
-              {/* INFORMACIÓN DEL NÚMERO */}
+              {/* NÚMERO / PRECIO */}
 
               <div
                 className="
-                  grid grid-cols-2 gap-3
+                  grid
+                  grid-cols-2
+                  gap-3
                 "
               >
                 <div
                   className="
-                    rounded-xl border
+                    rounded-xl
+                    border
                     border-white/[0.08]
                     bg-white/[0.03]
                     p-3
@@ -980,8 +1001,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 >
                   <p
                     className="
-                      text-[9px] font-semibold
-                      uppercase tracking-[0.12em]
+                      text-[9px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.12em]
                       text-slate-500
                     "
                   >
@@ -990,8 +1013,11 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <p
                     className="
-                      mt-1 font-mono text-2xl
-                      font-black tracking-wider
+                      mt-1
+                      font-mono
+                      text-2xl
+                      font-black
+                      tracking-wider
                       text-white
                     "
                   >
@@ -1001,7 +1027,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                 <div
                   className="
-                    rounded-xl border
+                    rounded-xl
+                    border
                     border-white/[0.08]
                     bg-white/[0.03]
                     p-3
@@ -1009,8 +1036,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 >
                   <p
                     className="
-                      text-[9px] font-semibold
-                      uppercase tracking-[0.12em]
+                      text-[9px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.12em]
                       text-slate-500
                     "
                   >
@@ -1019,11 +1048,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <p
                     className="
-                      mt-1 text-lg
-                      font-black text-emerald-400
+                      mt-1
+                      text-lg
+                      font-black
+                      text-emerald-400
                     "
                   >
-                    {formatPrice(ticketPrice)}
+                    {formatPrice(
+                      ticketPrice
+                    )}
                   </p>
                 </div>
               </div>
@@ -1033,49 +1066,62 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
               {!reservationExpired ? (
                 <div
                   className="
-                    rounded-xl border
+                    rounded-xl
+                    border
                     border-amber-500/20
                     bg-amber-500/[0.06]
-                    p-4 text-center
+                    p-4
+                    text-center
                   "
                 >
                   <p
                     className="
-                      text-[10px] font-bold
-                      uppercase tracking-[0.14em]
+                      text-[10px]
+                      font-bold
+                      uppercase
+                      tracking-[0.14em]
                       text-amber-400
                     "
                   >
-                    ⏱️ Tiempo para realizar el pago
+                    ⏱️ Tiempo para realizar
+                    el pago
                   </p>
 
                   <p
                     className="
-                      mt-1 font-mono text-3xl
-                      font-black tracking-wider
+                      mt-1
+                      font-mono
+                      text-3xl
+                      font-black
+                      tracking-wider
                       text-white
                     "
                   >
-                    {formatTime(timeLeft)}
+                    {formatTime(
+                      timeLeft
+                    )}
                   </p>
 
                   <p
                     className="
-                      mt-1 text-[10px]
+                      mt-1
+                      text-[10px]
                       text-slate-500
                     "
                   >
-                    Tu reserva tiene una duración
-                    de 30 minutos.
+                    Tu reserva tiene una
+                    duración de 30 minutos.
                   </p>
                 </div>
               ) : (
                 <div
                   className="
-                    rounded-xl border
+                    rounded-xl
+                    border
                     border-red-500/20
                     bg-red-500/[0.06]
-                    p-4 text-center
+                    p-4
+                    text-center
                   "
                 >
                   <div className="text-2xl">
@@ -1084,7 +1130,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <p
                     className="
-                      mt-1 text-sm font-bold
+                      mt-1
+                      text-sm
+                      font-bold
                       text-red-400
                     "
                   >
@@ -1093,24 +1141,30 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <p
                     className="
-                      mt-1 text-[11px]
-                      leading-5 text-slate-500
+                      mt-1
+                      text-[11px]
+                      leading-5
+                      text-slate-500
                     "
                   >
-                    La reserva ya no puede utilizarse
-                    para realizar el pago.
+                    La reserva ya no puede
+                    utilizarse para realizar
+                    el pago.
                   </p>
                 </div>
               )}
 
-              {/* QR */}
+              {/* ================================================== */}
+              {/* PAGOS */}
+              {/* ================================================== */}
 
               {!reservationExpired && (
                 <>
                   <div className="text-center">
                     <p
                       className="
-                        text-xs font-bold
+                        text-xs
+                        font-bold
                         text-white
                       "
                     >
@@ -1119,7 +1173,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                     <p
                       className="
-                        mt-1 text-[10px]
+                        mt-1
+                        text-[10px]
                         text-slate-500
                       "
                     >
@@ -1128,27 +1183,28 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     </p>
                   </div>
 
-                  <div
-                    className="
-                      flex justify-center
-                    "
-                  >
+                  <div className="flex justify-center">
                     <div
                       className="
-                        rounded-2xl border
+                        rounded-2xl
+                        border
                         border-white/10
-                        bg-white p-3
-                        shadow-xl shadow-black/20
+                        bg-white
+                        p-3
+                        shadow-xl
+                        shadow-black/20
                       "
                     >
                       <img
                         src="/images/qr-breb1.png"
                         alt="Código QR para realizar el pago mediante Bre-B"
                         className="
-                          h-72 w-72
+                          h-72
+                          w-72
                           max-w-full
                           object-contain
-                          sm:h-80 sm:w-80
+                          sm:h-80
+                          sm:w-80
                         "
                       />
                     </div>
@@ -1158,36 +1214,67 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <div className="space-y-3">
                     <div className="text-center">
-                      <p className="text-xs font-bold text-white">
-                        💳 También puedes pagar por transferencia
+                      <p
+                        className="
+                          text-xs
+                          font-bold
+                          text-white
+                        "
+                      >
+                        💳 También puedes pagar
+                        por transferencia
                       </p>
 
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        Utiliza cualquiera de estas opciones para realizar el pago.
+                      <p
+                        className="
+                          mt-1
+                          text-[10px]
+                          text-slate-500
+                        "
+                      >
+                        Utiliza cualquiera de
+                        estas opciones para
+                        realizar el pago.
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div
+                      className="
+                        grid
+                        grid-cols-1
+                        gap-3
+                        sm:grid-cols-2
+                      "
+                    >
                       {/* BANCOLOMBIA */}
 
                       <div
                         className="
                           rounded-xl
-                          border border-yellow-500/20
+                          border
+                          border-yellow-500/20
                           bg-yellow-500/[0.05]
                           p-3.5
-                          transition-colors
-                          hover:border-yellow-500/30
-                          hover:bg-yellow-500/[0.08]
                         "
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div
+                          className="
+                            flex
+                            items-center
+                            gap-2.5
+                          "
+                        >
                           <div
                             className="
-                              flex h-9 w-9 shrink-0
-                              items-center justify-center
+                              flex
+                              h-9
+                              w-9
+                              shrink-0
+                              items-center
+                              justify-center
                               rounded-lg
-                              border border-yellow-500/20
+                              border
+                              border-yellow-500/20
                               bg-yellow-500/10
                               text-lg
                             "
@@ -1208,7 +1295,13 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                               Bancolombia
                             </p>
 
-                            <p className="mt-0.5 text-[10px] text-slate-500">
+                            <p
+                              className="
+                                mt-0.5
+                                text-[10px]
+                                text-slate-500
+                              "
+                            >
                               Cuenta de ahorros
                             </p>
                           </div>
@@ -1218,9 +1311,11 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                           className="
                             mt-3
                             rounded-lg
-                            border border-white/[0.06]
+                            border
+                            border-white/[0.06]
                             bg-black/20
-                            px-3 py-2.5
+                            px-3
+                            py-2.5
                             text-center
                           "
                         >
@@ -1245,21 +1340,30 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       <div
                         className="
                           rounded-xl
-                          border border-pink-500/20
+                          border
+                          border-pink-500/20
                           bg-pink-500/[0.05]
                           p-3.5
-                          transition-colors
-                          hover:border-pink-500/30
-                          hover:bg-pink-500/[0.08]
                         "
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div
+                          className="
+                            flex
+                            items-center
+                            gap-2.5
+                          "
+                        >
                           <div
                             className="
-                              flex h-9 w-9 shrink-0
-                              items-center justify-center
+                              flex
+                              h-9
+                              w-9
+                              shrink-0
+                              items-center
+                              justify-center
                               rounded-lg
-                              border border-pink-500/20
+                              border
+                              border-pink-500/20
                               bg-pink-500/10
                               text-lg
                             "
@@ -1280,7 +1384,13 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                               Nequi
                             </p>
 
-                            <p className="mt-0.5 text-[10px] text-slate-500">
+                            <p
+                              className="
+                                mt-0.5
+                                text-[10px]
+                                text-slate-500
+                              "
+                            >
                               Número de celular
                             </p>
                           </div>
@@ -1290,9 +1400,11 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                           className="
                             mt-3
                             rounded-lg
-                            border border-white/[0.06]
+                            border
+                            border-white/[0.06]
                             bg-black/20
-                            px-3 py-2.5
+                            px-3
+                            py-2.5
                             text-center
                           "
                         >
@@ -1317,11 +1429,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                     <div
                       className="
-                        flex items-start gap-2.5
+                        flex
+                        items-start
+                        gap-2.5
                         rounded-xl
-                        border border-violet-500/15
+                        border
+                        border-violet-500/15
                         bg-violet-500/[0.05]
-                        px-3.5 py-3
+                        px-3.5
+                        py-3
                       "
                     >
                       <span className="mt-0.5 shrink-0 text-sm">
@@ -1343,12 +1459,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         <span className="font-semibold text-pink-300">
                           Nequi
                         </span>{" "}
-                        o escaneando el código QR de{" "}
+                        o escaneando el código
+                        QR de{" "}
                         <span className="font-semibold text-white">
                           Bre-B
                         </span>
-                        . Después de realizar el pago,
-                        envía el comprobante por WhatsApp.
+                        . Después de realizar
+                        el pago, envía el
+                        comprobante por
+                        WhatsApp.
                       </p>
                     </div>
                   </div>
@@ -1357,11 +1476,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <div
                     className="
-                      flex items-start gap-2.5
-                      rounded-xl border
+                      flex
+                      items-start
+                      gap-2.5
+                      rounded-xl
+                      border
                       border-blue-500/15
                       bg-blue-500/[0.05]
-                      px-3.5 py-3
+                      px-3.5
+                      py-3
                     "
                   >
                     <span className="mt-0.5 shrink-0 text-sm">
@@ -1375,36 +1498,43 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         text-slate-400
                       "
                     >
-                      Después de realizar el pago,
-                      envía el comprobante por
-                      WhatsApp para que podamos
-                      verificarlo y confirmar
-                      definitivamente tu número.
+                      Después de realizar el
+                      pago, envía el comprobante
+                      por WhatsApp para que
+                      podamos verificarlo y
+                      confirmar definitivamente
+                      tu número.
                     </p>
                   </div>
                 </>
               )}
 
-              {/* DATOS RESERVA */}
+              {/* DATOS */}
 
               <div
                 className="
-                  rounded-xl border
+                  rounded-xl
+                  border
                   border-white/[0.06]
-                  bg-black/20 p-3
+                  bg-black/20
+                  p-3
                 "
               >
                 <div
                   className="
-                    flex items-center
-                    justify-between gap-3
+                    flex
+                    items-center
+                    justify-between
+                    gap-3
                   "
                 >
                   <div>
                     <p
                       className="
-                        text-[9px] font-semibold
-                        uppercase tracking-[0.1em]
+                        text-[9px]
+                        font-semibold
+                        uppercase
+                        tracking-[0.1em]
                         text-slate-600
                       "
                     >
@@ -1413,8 +1543,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                     <p
                       className="
-                        mt-0.5 text-xs
-                        font-medium text-slate-300
+                        mt-0.5
+                        text-xs
+                        font-medium
+                        text-slate-300
                       "
                     >
                       {name}
@@ -1424,8 +1556,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   <div className="text-right">
                     <p
                       className="
-                        text-[9px] font-semibold
-                        uppercase tracking-[0.1em]
+                        text-[9px]
+                        font-semibold
+                        uppercase
+                        tracking-[0.1em]
                         text-slate-600
                       "
                     >
@@ -1434,8 +1568,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                     <p
                       className="
-                        mt-0.5 text-xs
-                        font-medium text-slate-300
+                        mt-0.5
+                        text-xs
+                        font-medium
+                        text-slate-300
                       "
                     >
                       {phone}
@@ -1446,30 +1582,41 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
             </>
           ) : (
             <>
-              {/* ================================================== */}
-              {/* NÚMERO + PRECIO */}
-              {/* ================================================== */}
+              {/* NÚMERO */}
 
               <div
                 className="
-                  flex items-center gap-3
-                  rounded-xl border
+                  flex
+                  items-center
+                  gap-3
+                  rounded-xl
+                  border
                   border-emerald-500/15
                   bg-emerald-500/[0.06]
-                  px-3.5 py-3
+                  px-3.5
+                  py-3
                 "
               >
                 <div
                   className="
-                    flex h-9 w-9 shrink-0
-                    items-center justify-center
-                    rounded-lg border
+                    flex
+                    h-9
+                    w-9
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-lg
+                    border
                     border-emerald-500/20
                     bg-black/20
                   "
                 >
                   <svg
-                    className="h-4.5 w-4.5 text-emerald-400"
+                    className="
+                      h-4.5
+                      w-4.5
+                      text-emerald-400
+                    "
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1478,16 +1625,23 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.8"
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 00-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
                     />
                   </svg>
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div
+                  className="
+                    min-w-0
+                    flex-1
+                  "
+                >
                   <p
                     className="
-                      text-[9px] font-semibold
-                      uppercase tracking-[0.12em]
+                      text-[9px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.12em]
                       text-slate-500
                     "
                   >
@@ -1496,14 +1650,18 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <div
                     className="
-                      mt-0.5 flex items-baseline
+                      mt-0.5
+                      flex
+                      items-baseline
                       gap-2
                     "
                   >
                     <span
                       className="
-                        font-mono text-xl
-                        font-black tracking-wide
+                        font-mono
+                        text-xl
+                        font-black
+                        tracking-wide
                         text-white
                       "
                     >
@@ -1512,12 +1670,16 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                     <span
                       className="
-                        rounded-full border
+                        rounded-full
+                        border
                         border-emerald-500/20
                         bg-emerald-500/10
-                        px-1.5 py-0.5
-                        text-[8px] font-bold
-                        uppercase tracking-wide
+                        px-1.5
+                        py-0.5
+                        text-[8px]
+                        font-bold
+                        uppercase
+                        tracking-wide
                         text-emerald-400
                       "
                     >
@@ -1529,8 +1691,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 <div className="shrink-0 text-right">
                   <p
                     className="
-                      text-[9px] font-semibold
-                      uppercase tracking-[0.1em]
+                      text-[9px]
+                      font-semibold
+                      uppercase
+                      tracking-[0.1em]
                       text-slate-500
                     "
                   >
@@ -1539,11 +1703,14 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
                   <p
                     className="
-                      text-sm font-bold
+                      text-sm
+                      font-bold
                       text-emerald-400
                     "
                   >
-                    {formatPrice(ticketPrice)}
+                    {formatPrice(
+                      ticketPrice
+                    )}
                   </p>
                 </div>
               </div>
@@ -1552,11 +1719,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
               <div
                 className="
-                  flex items-start gap-2.5
-                  rounded-xl border
+                  flex
+                  items-start
+                  gap-2.5
+                  rounded-xl
+                  border
                   border-amber-500/15
                   bg-amber-500/[0.06]
-                  px-3.5 py-3
+                  px-3.5
+                  py-3
                 "
               >
                 <span className="mt-0.5 shrink-0 text-sm">
@@ -1584,13 +1755,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </p>
               </div>
 
-              {/* DATOS DEL COMPRADOR */}
+              {/* DATOS */}
 
               <div className="space-y-3 pt-0.5">
                 <p
                   className="
-                    text-[11px] font-semibold
-                    uppercase tracking-[0.1em]
+                    text-[11px]
+                    font-semibold
+                    uppercase
+                    tracking-[0.1em]
                     text-slate-500
                   "
                 >
@@ -1603,73 +1776,56 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   <label
                     htmlFor="reservation-name"
                     className="
-                      mb-1.5 block text-xs
-                      font-medium text-slate-300
+                      mb-1.5
+                      block
+                      text-xs
+                      font-medium
+                      text-slate-300
                     "
                   >
                     Nombre completo
                   </label>
 
-                  <div className="group relative">
-                    <svg
-                      className="
-                        pointer-events-none
-                        absolute left-3 top-1/2
-                        h-4 w-4
-                        -translate-y-1/2
-                        text-slate-600
-                        transition-colors
-                        group-focus-within:text-violet-400
-                      "
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.8"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0"
-                      />
-                    </svg>
-
-                    <input
-                      id="reservation-name"
-                      type="text"
-                      autoComplete="name"
-                      disabled={loading}
-                      placeholder="Ej. Juan Pérez"
-                      value={name}
-                      onChange={(e) =>
-                        setName(
-                          e.target.value
-                        )
+                  <input
+                    id="reservation-name"
+                    type="text"
+                    autoComplete="name"
+                    disabled={loading}
+                    placeholder="Ej. Juan Pérez"
+                    value={name}
+                    onChange={(e) =>
+                      setName(
+                        e.target.value
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter"
+                      ) {
+                        handleSubmit();
                       }
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter"
-                        ) {
-                          handleSubmit();
-                        }
-                      }}
-                      className="
-                        w-full rounded-lg
-                        border border-white/[0.08]
-                        bg-slate-950/70
-                        py-2.5 pl-9 pr-3
-                        text-sm text-white
-                        placeholder:text-slate-700
-                        outline-none
-                        transition-colors duration-150
-                        hover:border-white/[0.14]
-                        focus:border-violet-500/60
-                        focus:ring-2
-                        focus:ring-violet-500/10
-                        disabled:cursor-not-allowed
-                        disabled:opacity-50
-                      "
-                    />
-                  </div>
+                    }}
+                    className="
+                      w-full
+                      rounded-lg
+                      border
+                      border-white/[0.08]
+                      bg-slate-950/70
+                      px-3
+                      py-2.5
+                      text-sm
+                      text-white
+                      placeholder:text-slate-700
+                      outline-none
+                      transition-colors
+                      hover:border-white/[0.14]
+                      focus:border-violet-500/60
+                      focus:ring-2
+                      focus:ring-violet-500/10
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
+                    "
+                  />
                 </div>
 
                 {/* TELÉFONO */}
@@ -1678,79 +1834,64 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   <label
                     htmlFor="reservation-phone"
                     className="
-                      mb-1.5 block text-xs
-                      font-medium text-slate-300
+                      mb-1.5
+                      block
+                      text-xs
+                      font-medium
+                      text-slate-300
                     "
                   >
                     Número de teléfono
                   </label>
 
-                  <div className="group relative">
-                    <svg
-                      className="
-                        pointer-events-none
-                        absolute left-3 top-1/2
-                        h-4 w-4
-                        -translate-y-1/2
-                        text-slate-600
-                        transition-colors
-                        group-focus-within:text-violet-400
-                      "
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.8"
-                        d="M3 5a2 2 0 012-2h3.28a2 2 0 011.94 1.515l.7 2.8a2 2 0 01-.53 1.94L8.7 10.95a16 16 0 006.35 6.35l1.695-1.69a2 2 0 011.94-.53l2.8.7A2 2 0 0123 17.72V21a2 2 0 01-2 2h-1C10.268 23 1 13.732 1 3V2a2 2 0 012-2z"
-                      />
-                    </svg>
-
-                    <input
-                      id="reservation-phone"
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      disabled={loading}
-                      placeholder="Ej. 300 123 4567"
-                      value={phone}
-                      onChange={(e) =>
-                        setPhone(
-                          e.target.value
-                        )
+                  <input
+                    id="reservation-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    disabled={loading}
+                    placeholder="Ej. 300 123 4567"
+                    value={phone}
+                    onChange={(e) =>
+                      setPhone(
+                        e.target.value
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter"
+                      ) {
+                        handleSubmit();
                       }
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter"
-                        ) {
-                          handleSubmit();
-                        }
-                      }}
-                      className="
-                        w-full rounded-lg
-                        border border-white/[0.08]
-                        bg-slate-950/70
-                        py-2.5 pl-9 pr-3
-                        text-sm text-white
-                        placeholder:text-slate-700
-                        outline-none
-                        transition-colors duration-150
-                        hover:border-white/[0.14]
-                        focus:border-violet-500/60
-                        focus:ring-2
-                        focus:ring-violet-500/10
-                        disabled:cursor-not-allowed
-                        disabled:opacity-50
-                      "
-                    />
-                  </div>
+                    }}
+                    className="
+                      w-full
+                      rounded-lg
+                      border
+                      border-white/[0.08]
+                      bg-slate-950/70
+                      px-3
+                      py-2.5
+                      text-sm
+                      text-white
+                      placeholder:text-slate-700
+                      outline-none
+                      transition-colors
+                      hover:border-white/[0.14]
+                      focus:border-violet-500/60
+                      focus:ring-2
+                      focus:ring-violet-500/10
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
+                    "
+                  />
 
                   <p
                     className="
-                      mt-1.5 text-[10px]
-                      leading-4 text-slate-600
+                      mt-1.5
+                      text-[10px]
+                      leading-4
+                      text-slate-600
                     "
                   >
                     Usaremos este número para
@@ -1768,63 +1909,67 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
         <div
           className="
-            relative shrink-0 space-y-2.5
-            border-t border-white/[0.06]
-            bg-black/20 p-4 sm:p-5
+            relative
+            shrink-0
+            space-y-2.5
+            border-t
+            border-white/[0.06]
+            bg-black/20
+            p-4
+            sm:p-5
           "
         >
           {reserved ? (
             <>
-              {/* WHATSAPP */}
-
               {!reservationExpired && (
                 <button
                   type="button"
-                  onClick={handleWhatsApp}
+                  onClick={
+                    handleWhatsApp
+                  }
                   className="
-                    flex h-12 w-full
-                    items-center justify-center
-                    gap-2 rounded-lg
+                    flex
+                    h-12
+                    w-full
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-lg
                     bg-emerald-600
-                    text-sm font-bold
+                    text-sm
+                    font-bold
                     text-white
                     shadow-md
                     shadow-emerald-950/30
-                    transition-all duration-150
+                    transition-all
                     hover:bg-emerald-500
                     hover:shadow-lg
                     active:scale-[0.99]
                     active:bg-emerald-700
                   "
                 >
-                  <svg
-                    className="h-5 w-5 shrink-0"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.198.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"
-                    />
-                  </svg>
-
                   <span>
-                    📲 Enviar comprobante por WhatsApp
+                    📲 Enviar comprobante
+                    por WhatsApp
                   </span>
                 </button>
               )}
-
-              {/* CERRAR */}
 
               <button
                 type="button"
                 onClick={handleClose}
                 className="
-                  flex h-10 w-full
-                  items-center justify-center
+                  flex
+                  h-10
+                  w-full
+                  items-center
+                  justify-center
                   rounded-lg
-                  border border-white/[0.08]
+                  border
+                  border-white/[0.08]
                   bg-white/[0.03]
-                  text-sm font-semibold
+                  text-sm
+                  font-semibold
                   text-slate-400
                   transition-colors
                   hover:border-white/[0.14]
@@ -1835,29 +1980,30 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 Cerrar
               </button>
 
-              {/* AVISO FINAL */}
-
               {!reservationExpired && (
                 <p
                   className="
-                    text-center text-[10px]
-                    leading-4 text-slate-500
+                    text-center
+                    text-[10px]
+                    leading-4
+                    text-slate-500
                   "
                 >
                   Recuerda enviar el comprobante
                   después de realizar el pago.
-                  Tu número quedará pendiente de
-                  validación hasta verificar el pago.
+                  Tu número quedará pendiente
+                  de validación hasta verificar
+                  el pago.
                 </p>
               )}
             </>
           ) : (
             <>
-              {/* BOTONES */}
-
               <div
                 className="
-                  grid grid-cols-1 gap-2
+                  grid
+                  grid-cols-1
+                  gap-2
                   sm:grid-cols-[100px_1fr]
                 "
               >
@@ -1866,14 +2012,20 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   disabled={loading}
                   onClick={handleClose}
                   className="
-                    order-2 flex h-11 w-full
-                    items-center justify-center
+                    order-2
+                    flex
+                    h-11
+                    w-full
+                    items-center
+                    justify-center
                     rounded-lg
-                    border border-white/[0.08]
+                    border
+                    border-white/[0.08]
                     bg-white/[0.03]
-                    text-sm font-semibold
+                    text-sm
+                    font-semibold
                     text-slate-400
-                    transition-colors duration-150
+                    transition-colors
                     hover:border-white/[0.14]
                     hover:bg-white/[0.07]
                     hover:text-white
@@ -1890,15 +2042,21 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                   disabled={loading}
                   onClick={handleSubmit}
                   className="
-                    order-1 flex h-11 w-full
-                    items-center justify-center
-                    gap-2 rounded-lg
+                    order-1
+                    flex
+                    h-11
+                    w-full
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-lg
                     bg-emerald-600
-                    text-sm font-semibold
+                    text-sm
+                    font-semibold
                     text-white
                     shadow-md
                     shadow-emerald-950/30
-                    transition-colors duration-150
+                    transition-colors
                     hover:bg-emerald-500
                     active:bg-emerald-700
                     disabled:cursor-not-allowed
@@ -1910,9 +2068,12 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     <>
                       <span
                         className="
-                          h-4 w-4 shrink-0
+                          h-4
+                          w-4
+                          shrink-0
                           animate-spin
-                          rounded-full border-2
+                          rounded-full
+                          border-2
                           border-white/30
                           border-t-white
                         "
@@ -1924,19 +2085,9 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     </>
                   ) : (
                     <>
-                      <svg
-                        className="h-4 w-4 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.8"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <span>
+                        ✓
+                      </span>
 
                       <span>
                         Reservar número
@@ -1948,8 +2099,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
 
               <p
                 className="
-                  text-center text-[10px]
-                  leading-4 text-slate-500
+                  text-center
+                  text-[10px]
+                  leading-4
+                  text-slate-500
                 "
               >
                 Al reservar tendrás 30 minutos
