@@ -11,9 +11,7 @@ import {
 
 import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
-import {
-  getVisitorId,
-} from "@/lib/reservations";
+import { getVisitorId } from "@/lib/reservations";
 import toast from "react-hot-toast";
 
 // ============================================================
@@ -137,7 +135,7 @@ export default function ReservationModal({
   }
 
   // ============================================================
-  // CARGAR RESERVA
+  // CARGAR RESERVA EXISTENTE
   // ============================================================
 
   useEffect(() => {
@@ -145,6 +143,17 @@ export default function ReservationModal({
 
     async function loadExistingReservation() {
       try {
+        /*
+         * IMPORTANTE:
+         *
+         * El visitorId se obtiene del navegador.
+         *
+         * No necesitamos Firebase Auth.
+         *
+         * Si el visitante vuelve a abrir la página
+         * desde el mismo navegador, localStorage conserva
+         * el mismo visitorId.
+         */
         const visitorId =
           getVisitorId();
 
@@ -172,15 +181,15 @@ export default function ReservationModal({
           snapshot.data();
 
         // ======================================================
-        // SOLO MOSTRAR COMO "TU RESERVA"
-        // SI EL VISITOR ID COINCIDE
+        // SEGURIDAD
+        //
+        // SOLAMENTE EL NAVEGADOR QUE HIZO LA RESERVA
+        // PUEDE VERLA COMO SUYA.
         // ======================================================
 
         if (
-          data.status !==
-            "reserved" ||
-          data.buyerVisitorId !==
-            visitorId
+          data.status !== "reserved" ||
+          data.buyerVisitorId !== visitorId
         ) {
           if (mounted) {
             setReserved(false);
@@ -192,7 +201,7 @@ export default function ReservationModal({
         }
 
         // ======================================================
-        // EXPIRACIÓN
+        // OBTENER EXPIRACIÓN
         // ======================================================
 
         let expirationTime:
@@ -209,8 +218,7 @@ export default function ReservationModal({
           expirationTime =
             storedExpiration.toMillis();
         } else if (
-          storedExpiration instanceof
-          Date
+          storedExpiration instanceof Date
         ) {
           expirationTime =
             storedExpiration.getTime();
@@ -221,10 +229,30 @@ export default function ReservationModal({
         ) {
           expirationTime =
             storedExpiration.toMillis();
+        } else if (
+          typeof storedExpiration ===
+          "string"
+        ) {
+          const parsed =
+            new Date(
+              storedExpiration
+            ).getTime();
+
+          if (
+            !Number.isNaN(parsed)
+          ) {
+            expirationTime = parsed;
+          }
+        } else if (
+          typeof storedExpiration ===
+          "number"
+        ) {
+          expirationTime =
+            storedExpiration;
         }
 
         // ======================================================
-        // SIN FECHA
+        // SIN FECHA DE EXPIRACIÓN
         // ======================================================
 
         if (!expirationTime) {
@@ -232,6 +260,18 @@ export default function ReservationModal({
             setReserved(true);
             setExpiresAt(null);
             setTimeLeft(0);
+
+            if (data.buyerName) {
+              setName(
+                data.buyerName
+              );
+            }
+
+            if (data.buyerPhone) {
+              setPhone(
+                data.buyerPhone
+              );
+            }
           }
 
           return;
@@ -246,23 +286,37 @@ export default function ReservationModal({
           Date.now();
 
         // ======================================================
-        // EXPIRADA
+        // RESERVA EXPIRADA
         // ======================================================
 
         if (remaining <= 0) {
           if (mounted) {
             setReserved(true);
+
             setExpiresAt(
               expirationTime
             );
+
             setTimeLeft(0);
+
+            if (data.buyerName) {
+              setName(
+                data.buyerName
+              );
+            }
+
+            if (data.buyerPhone) {
+              setPhone(
+                data.buyerPhone
+              );
+            }
           }
 
           return;
         }
 
         // ======================================================
-        // ACTIVA
+        // RESERVA ACTIVA
         // ======================================================
 
         if (mounted) {
@@ -383,6 +437,7 @@ export default function ReservationModal({
       toast.error(
         "Ingresa tu nombre completo"
       );
+
       return;
     }
 
@@ -392,6 +447,7 @@ export default function ReservationModal({
       toast.error(
         "El nombre debe tener al menos 3 caracteres"
       );
+
       return;
     }
 
@@ -399,6 +455,7 @@ export default function ReservationModal({
       toast.error(
         "Ingresa tu número de teléfono"
       );
+
       return;
     }
 
@@ -408,6 +465,7 @@ export default function ReservationModal({
       toast.error(
         "Ingresa un teléfono válido"
       );
+
       return;
     }
 
@@ -443,7 +501,7 @@ export default function ReservationModal({
         );
 
       // ========================================================
-      // COMPROBAR ESTADO
+      // COMPROBAR ESTADO ACTUAL
       // ========================================================
 
       const currentSnapshot =
@@ -501,23 +559,20 @@ export default function ReservationModal({
         RESERVATION_TIME_MS;
 
       // ========================================================
-      // GUARDAR
+      // GUARDAR RESERVA
       // ========================================================
 
       await updateDoc(
         numberRef,
         {
-          status: "reserved",
+          status:
+            "reserved",
 
           buyerName:
             cleanName,
 
           buyerPhone:
             cleanPhone,
-
-          // ====================================================
-          // IDENTIFICADOR DEL VISITANTE
-          // ====================================================
 
           buyerVisitorId:
             visitorId,
@@ -682,10 +737,6 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
           scrollbar-width: none;
         }
       `}</style>
-
-      {/* ====================================================== */}
-      {/* MODAL */}
-      {/* ====================================================== */}
 
       <div
         className="
@@ -1154,9 +1205,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                 </div>
               )}
 
-              {/* ================================================== */}
               {/* PAGOS */}
-              {/* ================================================== */}
 
               {!reservationExpired && (
                 <>
@@ -1625,7 +1674,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.8"
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 00-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.042-.133-2.053-.382-3.016z"
                     />
                   </svg>
                 </div>

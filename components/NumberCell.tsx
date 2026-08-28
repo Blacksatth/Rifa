@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -76,13 +77,24 @@ export default function NumberCell({
     useState<string | null>(null);
 
   // ============================================================
-  // OBTENER VISITOR ID
+  // CARGAR VISITOR ID
   // ============================================================
 
   useEffect(() => {
+    /*
+     * Esto se ejecuta solamente en el navegador.
+     *
+     * Es compatible con Vercel porque:
+     * - no se ejecuta durante SSR
+     * - no depende de Firebase Auth
+     * - utiliza localStorage
+     */
+
     const id = getVisitorId();
 
-    setVisitorId(id);
+    if (id) {
+      setVisitorId(id);
+    }
   }, []);
 
   // ============================================================
@@ -100,8 +112,17 @@ export default function NumberCell({
   // ¿ES MI RESERVA?
   // ============================================================
 
+  /*
+   * Mientras visitorId todavía está cargando,
+   * NO consideramos ninguna reserva como nuestra.
+   *
+   * Esto evita que un número reservado pueda abrirse
+   * accidentalmente durante el primer render.
+   */
+
   const mine =
     status === "reserved" &&
+    visitorId !== null &&
     isReservationMine(
       data,
       visitorId
@@ -120,6 +141,17 @@ export default function NumberCell({
   // ============================================================
   // PUEDE ABRIR
   // ============================================================
+
+  /*
+   * Disponible:
+   * cualquier visitante puede abrirlo.
+   *
+   * Reservado:
+   * solamente el visitante que realizó la reserva.
+   *
+   * Vendido:
+   * nadie puede abrirlo.
+   */
 
   const canOpen =
     isAvailable || mine;
@@ -384,3 +416,4 @@ export default function NumberCell({
     </button>
   );
 }
+
