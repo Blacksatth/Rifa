@@ -18,8 +18,7 @@ import toast from "react-hot-toast";
 // WHATSAPP DEL ADMINISTRADOR
 // ============================================================
 
-const ADMIN_WHATSAPP =
-  "573025636290";
+const ADMIN_WHATSAPP = "573025636290";
 
 // ============================================================
 // TIEMPO DE RESERVA
@@ -28,9 +27,7 @@ const ADMIN_WHATSAPP =
 const RESERVATION_TIME_MINUTES = 30;
 
 const RESERVATION_TIME_MS =
-  RESERVATION_TIME_MINUTES *
-  60 *
-  1000;
+  RESERVATION_TIME_MINUTES * 60 * 1000;
 
 export default function ReservationModal({
   raffleId,
@@ -43,35 +40,37 @@ export default function ReservationModal({
   number: RaffleNumber;
   onClose: () => void;
 }) {
-  const [name, setName] =
-    useState("");
+  const [name, setName] = useState("");
 
-  const [phone, setPhone] =
-    useState("");
+  const [phone, setPhone] = useState("");
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [reserved, setReserved] =
-    useState(false);
+  const [reserved, setReserved] = useState(false);
 
   const [expiresAt, setExpiresAt] =
     useState<number | null>(null);
 
-  const [timeLeft, setTimeLeft] =
-    useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // ============================================================
+  // NUEVO:
+  // MIENTRAS FIREBASE COMPRUEBA LA RESERVA
+  // ============================================================
+
+  const [checkingReservation, setCheckingReservation] =
+    useState(true);
 
   // ============================================================
   // INFORMACIÓN RIFA
   // ============================================================
 
-  const raffleData =
-    raffle as Raffle & {
-      name?: string;
-      title?: string;
-      price?: number;
-      ticketPrice?: number;
-    };
+  const raffleData = raffle as Raffle & {
+    name?: string;
+    title?: string;
+    price?: number;
+    ticketPrice?: number;
+  };
 
   const raffleName =
     raffleData.name ||
@@ -87,51 +86,38 @@ export default function ReservationModal({
   // PRECIO
   // ============================================================
 
-  function formatPrice(
-    price: number | null
-  ) {
+  function formatPrice(price: number | null) {
     if (price === null) {
       return "Consultar precio";
     }
 
-    return new Intl.NumberFormat(
-      "es-CO",
-      {
-        style: "currency",
-        currency: "COP",
-        maximumFractionDigits: 0,
-      }
-    ).format(price);
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(price);
   }
 
   // ============================================================
   // TIEMPO
   // ============================================================
 
-  function formatTime(
-    milliseconds: number
-  ) {
-    const totalSeconds =
-      Math.max(
-        0,
-        Math.floor(
-          milliseconds / 1000
-        )
-      );
+  function formatTime(milliseconds: number) {
+    const totalSeconds = Math.max(
+      0,
+      Math.floor(milliseconds / 1000)
+    );
 
-    const minutes =
-      Math.floor(
-        totalSeconds / 60
-      );
+    const minutes = Math.floor(
+      totalSeconds / 60
+    );
 
-    const seconds =
-      totalSeconds % 60;
+    const seconds = totalSeconds % 60;
 
-    return `${String(
-      minutes
-    ).padStart(2, "0")}:${String(
-      seconds
-    ).padStart(2, "0")}`;
+    return `${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
   }
 
   // ============================================================
@@ -143,48 +129,56 @@ export default function ReservationModal({
 
     async function loadExistingReservation() {
       try {
-        /*
-         * IMPORTANTE:
-         *
-         * El visitorId se obtiene del navegador.
-         *
-         * No necesitamos Firebase Auth.
-         *
-         * Si el visitante vuelve a abrir la página
-         * desde el mismo navegador, localStorage conserva
-         * el mismo visitorId.
-         */
-        const visitorId =
-          getVisitorId();
+        // ======================================================
+        // VISITOR ID
+        // ======================================================
+
+        const visitorId = getVisitorId();
 
         if (!visitorId) {
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
+            setTimeLeft(0);
+            setCheckingReservation(false);
+          }
+
           return;
         }
-
-        const numberRef =
-          doc(
-            db,
-            "raffles",
-            raffleId,
-            "numbers",
-            number.id
-          );
-
-        const snapshot =
-          await getDoc(numberRef);
-
-        if (!snapshot.exists()) {
-          return;
-        }
-
-        const data =
-          snapshot.data();
 
         // ======================================================
-        // SEGURIDAD
-        //
-        // SOLAMENTE EL NAVEGADOR QUE HIZO LA RESERVA
-        // PUEDE VERLA COMO SUYA.
+        // REFERENCIA DEL NÚMERO
+        // ======================================================
+
+        const numberRef = doc(
+          db,
+          "raffles",
+          raffleId,
+          "numbers",
+          number.id
+        );
+
+        // ======================================================
+        // CONSULTAR FIREBASE
+        // ======================================================
+
+        const snapshot = await getDoc(numberRef);
+
+        if (!snapshot.exists()) {
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
+            setTimeLeft(0);
+            setCheckingReservation(false);
+          }
+
+          return;
+        }
+
+        const data = snapshot.data();
+
+        // ======================================================
+        // COMPROBAR SI ES RESERVA DE ESTE NAVEGADOR
         // ======================================================
 
         if (
@@ -195,25 +189,32 @@ export default function ReservationModal({
             setReserved(false);
             setExpiresAt(null);
             setTimeLeft(0);
+            setCheckingReservation(false);
           }
 
           return;
         }
 
         // ======================================================
-        // OBTENER EXPIRACIÓN
+        // CARGAR DATOS DEL COMPRADOR
         // ======================================================
 
-        let expirationTime:
-          | number
-          | null = null;
+        if (mounted) {
+          setName(data.buyerName || "");
+          setPhone(data.buyerPhone || "");
+        }
+
+        // ======================================================
+        // OBTENER FECHA DE EXPIRACIÓN
+        // ======================================================
+
+        let expirationTime: number | null = null;
 
         const storedExpiration =
           data.reservationExpiresAt;
 
         if (
-          storedExpiration instanceof
-          Timestamp
+          storedExpiration instanceof Timestamp
         ) {
           expirationTime =
             storedExpiration.toMillis();
@@ -230,29 +231,23 @@ export default function ReservationModal({
           expirationTime =
             storedExpiration.toMillis();
         } else if (
-          typeof storedExpiration ===
-          "string"
+          typeof storedExpiration === "string"
         ) {
-          const parsed =
-            new Date(
-              storedExpiration
-            ).getTime();
+          const parsed = new Date(
+            storedExpiration
+          ).getTime();
 
-          if (
-            !Number.isNaN(parsed)
-          ) {
+          if (!Number.isNaN(parsed)) {
             expirationTime = parsed;
           }
         } else if (
-          typeof storedExpiration ===
-          "number"
+          typeof storedExpiration === "number"
         ) {
-          expirationTime =
-            storedExpiration;
+          expirationTime = storedExpiration;
         }
 
         // ======================================================
-        // SIN FECHA DE EXPIRACIÓN
+        // NO EXISTE FECHA DE EXPIRACIÓN
         // ======================================================
 
         if (!expirationTime) {
@@ -260,56 +255,76 @@ export default function ReservationModal({
             setReserved(true);
             setExpiresAt(null);
             setTimeLeft(0);
-
-            if (data.buyerName) {
-              setName(
-                data.buyerName
-              );
-            }
-
-            if (data.buyerPhone) {
-              setPhone(
-                data.buyerPhone
-              );
-            }
+            setCheckingReservation(false);
           }
 
           return;
         }
 
         // ======================================================
-        // TIEMPO RESTANTE
+        // CALCULAR TIEMPO RESTANTE
         // ======================================================
 
         const remaining =
-          expirationTime -
-          Date.now();
+          expirationTime - Date.now();
 
         // ======================================================
-        // RESERVA EXPIRADA
+        // RESERVA YA EXPIRADA
         // ======================================================
 
         if (remaining <= 0) {
-          if (mounted) {
-            setReserved(true);
+          try {
+            // Volvemos a consultar para evitar liberar
+            // una reserva que haya cambiado mientras tanto.
 
-            setExpiresAt(
-              expirationTime
+            const latestSnapshot =
+              await getDoc(numberRef);
+
+            if (latestSnapshot.exists()) {
+              const latestData =
+                latestSnapshot.data();
+
+              // ==================================================
+              // SOLO LIBERAR SI SIGUE SIENDO LA MISMA RESERVA
+              // ==================================================
+
+              if (
+                latestData.status ===
+                  "reserved" &&
+                latestData.buyerVisitorId ===
+                  visitorId
+              ) {
+                await updateDoc(
+                  numberRef,
+                  {
+                    status: "available",
+
+                    buyerName: null,
+
+                    buyerPhone: null,
+
+                    buyerVisitorId: null,
+
+                    reservedAt: null,
+
+                    reservationExpiresAt:
+                      null,
+                  }
+                );
+              }
+            }
+          } catch (error) {
+            console.error(
+              "Error liberando reserva expirada:",
+              error
             );
+          }
 
+          if (mounted) {
+            setReserved(false);
+            setExpiresAt(null);
             setTimeLeft(0);
-
-            if (data.buyerName) {
-              setName(
-                data.buyerName
-              );
-            }
-
-            if (data.buyerPhone) {
-              setPhone(
-                data.buyerPhone
-              );
-            }
+            setCheckingReservation(false);
           }
 
           return;
@@ -330,23 +345,17 @@ export default function ReservationModal({
             remaining
           );
 
-          if (data.buyerName) {
-            setName(
-              data.buyerName
-            );
-          }
-
-          if (data.buyerPhone) {
-            setPhone(
-              data.buyerPhone
-            );
-          }
+          setCheckingReservation(false);
         }
       } catch (error) {
         console.error(
           "Error cargando reserva:",
           error
         );
+
+        if (mounted) {
+          setCheckingReservation(false);
+        }
       }
     }
 
@@ -372,42 +381,154 @@ export default function ReservationModal({
       return;
     }
 
-    const initialRemaining =
-      expiresAt -
-      Date.now();
+    let released = false;
 
-    setTimeLeft(
-      Math.max(
-        0,
-        initialRemaining
-      )
-    );
+    // ============================================================
+    // LIBERAR RESERVA
+    // ============================================================
 
-    if (
-      initialRemaining <= 0
-    ) {
-      return;
-    }
-
-    const interval =
-      setInterval(() => {
-        const remaining =
-          expiresAt -
-          Date.now();
-
-        if (remaining <= 0) {
-          setTimeLeft(0);
-
-          clearInterval(
-            interval
-          );
-
+    const releaseReservation =
+      async () => {
+        if (released) {
           return;
         }
 
-        setTimeLeft(
-          remaining
-        );
+        released = true;
+
+        const visitorId =
+          getVisitorId();
+
+        if (!visitorId) {
+          return;
+        }
+
+        try {
+          const numberRef =
+            doc(
+              db,
+              "raffles",
+              raffleId,
+              "numbers",
+              number.id
+            );
+
+          // ======================================================
+          // CONSULTAR ESTADO ACTUAL
+          // ======================================================
+
+          const snapshot =
+            await getDoc(numberRef);
+
+          if (!snapshot.exists()) {
+            return;
+          }
+
+          const data =
+            snapshot.data();
+
+          // ======================================================
+          // SEGURIDAD
+          //
+          // SOLO LIBERAR SI:
+          //
+          // 1. Sigue reservado
+          // 2. Pertenece al mismo navegador
+          // ======================================================
+
+          if (
+            data.status !==
+              "reserved" ||
+            data.buyerVisitorId !==
+              visitorId
+          ) {
+            return;
+          }
+
+          // ======================================================
+          // LIBERAR
+          // ======================================================
+
+          await updateDoc(
+            numberRef,
+            {
+              status: "available",
+
+              buyerName: null,
+
+              buyerPhone: null,
+
+              buyerVisitorId: null,
+
+              reservedAt: null,
+
+              reservationExpiresAt:
+                null,
+            }
+          );
+
+          // ======================================================
+          // ACTUALIZAR UI
+          // ======================================================
+
+          setReserved(false);
+
+          setExpiresAt(null);
+
+          setTimeLeft(0);
+
+          toast.error(
+            "El tiempo de reserva terminó. El número fue liberado."
+          );
+        } catch (error) {
+          console.error(
+            "Error liberando reserva:",
+            error
+          );
+
+          // Permitimos reintentar si Firebase falló.
+          released = false;
+        }
+      };
+
+    // ============================================================
+    // ACTUALIZAR CONTADOR
+    // ============================================================
+
+    const updateTimer = () => {
+      const remaining =
+        expiresAt - Date.now();
+
+      if (remaining <= 0) {
+        setTimeLeft(0);
+
+        void releaseReservation();
+
+        return true;
+      }
+
+      setTimeLeft(remaining);
+
+      return false;
+    };
+
+    // ============================================================
+    // EJECUTAR INMEDIATAMENTE
+    // ============================================================
+
+    const alreadyExpired =
+      updateTimer();
+
+    if (alreadyExpired) {
+      return;
+    }
+
+    // ============================================================
+    // ACTUALIZAR CADA SEGUNDO
+    // ============================================================
+
+    const interval =
+      setInterval(() => {
+        updateTimer();
       }, 1000);
 
     return () => {
@@ -416,6 +537,8 @@ export default function ReservationModal({
   }, [
     reserved,
     expiresAt,
+    raffleId,
+    number.id,
   ]);
 
   // ============================================================
@@ -469,9 +592,9 @@ export default function ReservationModal({
       return;
     }
 
-    // ========================================================
+    // ============================================================
     // VISITOR ID
-    // ========================================================
+    // ============================================================
 
     const visitorId =
       getVisitorId();
@@ -487,9 +610,9 @@ export default function ReservationModal({
     setLoading(true);
 
     try {
-      // ========================================================
+      // ==========================================================
       // REFERENCIA
-      // ========================================================
+      // ==========================================================
 
       const numberRef =
         doc(
@@ -500,9 +623,9 @@ export default function ReservationModal({
           number.id
         );
 
-      // ========================================================
+      // ==========================================================
       // COMPROBAR ESTADO ACTUAL
-      // ========================================================
+      // ==========================================================
 
       const currentSnapshot =
         await getDoc(numberRef);
@@ -520,9 +643,9 @@ export default function ReservationModal({
       const currentData =
         currentSnapshot.data();
 
-      // ========================================================
+      // ==========================================================
       // YA ESTÁ RESERVADO
-      // ========================================================
+      // ==========================================================
 
       if (
         currentData.status ===
@@ -535,9 +658,9 @@ export default function ReservationModal({
         return;
       }
 
-      // ========================================================
+      // ==========================================================
       // YA ESTÁ VENDIDO
-      // ========================================================
+      // ==========================================================
 
       if (
         currentData.status ===
@@ -550,23 +673,22 @@ export default function ReservationModal({
         return;
       }
 
-      // ========================================================
+      // ==========================================================
       // EXPIRACIÓN
-      // ========================================================
+      // ==========================================================
 
       const reservationExpiresAt =
         Date.now() +
         RESERVATION_TIME_MS;
 
-      // ========================================================
+      // ==========================================================
       // GUARDAR RESERVA
-      // ========================================================
+      // ==========================================================
 
       await updateDoc(
         numberRef,
         {
-          status:
-            "reserved",
+          status: "reserved",
 
           buyerName:
             cleanName,
@@ -587,9 +709,13 @@ export default function ReservationModal({
         }
       );
 
-      // ========================================================
+      // ==========================================================
       // ACTUALIZAR UI
-      // ========================================================
+      // ==========================================================
+
+      setName(cleanName);
+
+      setPhone(cleanPhone);
 
       setExpiresAt(
         reservationExpiresAt
@@ -708,6 +834,182 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
     timeLeft <= 0;
 
   // ============================================================
+  // PANTALLA DE ESPERA
+  // ============================================================
+
+  if (checkingReservation) {
+    return (
+      <div
+        className="
+          fixed inset-0 z-50
+          flex items-center justify-center
+          bg-black/70
+          p-4
+          backdrop-blur-sm
+          animate-in
+          fade-in
+          duration-200
+        "
+      >
+        <div
+          className="
+            relative
+            w-full
+            max-w-sm
+            overflow-hidden
+            rounded-2xl
+            border
+            border-white/10
+            bg-[#0b0e1a]
+            p-6
+            text-center
+            shadow-2xl
+            shadow-black/50
+            animate-in
+            zoom-in-95
+            duration-200
+          "
+        >
+          {/* GLOW */}
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -right-20
+              -top-20
+              h-40
+              w-40
+              rounded-full
+              bg-violet-600/10
+              blur-[70px]
+            "
+          />
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -bottom-20
+              -left-20
+              h-40
+              w-40
+              rounded-full
+              bg-blue-600/10
+              blur-[70px]
+            "
+          />
+
+          {/* ICONO */}
+
+          <div
+            className="
+              relative
+              mx-auto
+              flex
+              h-14
+              w-14
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-violet-500/20
+              bg-violet-500/10
+            "
+          >
+            <span
+              className="
+                h-6
+                w-6
+                animate-spin
+                rounded-full
+                border-2
+                border-violet-400/20
+                border-t-violet-400
+              "
+            />
+          </div>
+
+          {/* TEXTO */}
+
+          <h3
+            className="
+              relative
+              mt-4
+              text-base
+              font-bold
+              text-white
+            "
+          >
+            Comprobando reserva
+          </h3>
+
+          <p
+            className="
+              relative
+              mt-2
+              text-xs
+              leading-5
+              text-slate-500
+            "
+          >
+            Estamos verificando el estado
+            del número. Un momento...
+          </p>
+
+          {/* PUNTOS */}
+
+          <div
+            className="
+              relative
+              mt-4
+              flex
+              justify-center
+              gap-1.5
+            "
+          >
+            <span
+              className="
+                h-1.5
+                w-1.5
+                animate-pulse
+                rounded-full
+                bg-violet-400
+              "
+            />
+
+            <span
+              className="
+                h-1.5
+                w-1.5
+                animate-pulse
+                rounded-full
+                bg-violet-400
+              "
+              style={{
+                animationDelay: "150ms",
+              }}
+            />
+
+            <span
+              className="
+                h-1.5
+                w-1.5
+                animate-pulse
+                rounded-full
+                bg-violet-400
+              "
+              style={{
+                animationDelay: "300ms",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
   // RENDER
   // ============================================================
 
@@ -719,7 +1021,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
         bg-black/70
         p-3
         backdrop-blur-sm
-        animate-in fade-in
+        animate-in
+        fade-in
         duration-200
         sm:p-4
       "
@@ -998,8 +1301,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     viewBox="0 0 24 24"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      fill="none"
+                      stroke="currentColor"
                       strokeWidth="2"
                       d="M5 13l4 4L19 7"
                     />
