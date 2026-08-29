@@ -6,6 +6,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminHeader from "@/components/admin/AdminHeader";
+
 export default function AdminLayout({
   children,
 }: {
@@ -162,7 +165,62 @@ export default function AdminLayout({
 
   /*
    * Usuario autorizado.
+   *
+   * Aquí comienza el nuevo panel administrativo.
    */
 
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-[#060713] text-white">
+
+      {/* Fondo general */}
+
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+
+        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-violet-600/10 blur-3xl" />
+
+        <div className="absolute -right-40 top-1/2 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-3xl" />
+
+        <div
+          className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+      </div>
+
+      <div className="relative flex min-h-screen">
+
+        {/* SIDEBAR */}
+
+        <AdminSidebar />
+
+        {/* CONTENIDO */}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+
+          {/* HEADER */}
+
+          <AdminHeader />
+
+          {/* PÁGINA */}
+
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+
+            <div className="mx-auto w-full max-w-7xl">
+
+              {children}
+
+            </div>
+
+          </main>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
 }
