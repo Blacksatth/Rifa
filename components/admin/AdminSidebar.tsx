@@ -22,6 +22,7 @@ export default function AdminSidebar() {
     {
       href: "/admin",
       label: "Estadísticas",
+      shortLabel: "Inicio",
       description: "Resumen de la rifa",
       icon: (
         <svg
@@ -43,6 +44,7 @@ export default function AdminSidebar() {
     {
       href: "/admin/rifa",
       label: "Crear rifa",
+      shortLabel: "Rifa",
       description: "Crear y configurar",
       icon: (
         <svg
@@ -64,6 +66,7 @@ export default function AdminSidebar() {
     {
       href: "/admin/numeros",
       label: "Números vendidos",
+      shortLabel: "Números",
       description: "Gestionar participantes",
       icon: (
         <svg
@@ -101,21 +104,20 @@ export default function AdminSidebar() {
 
   return (
     <>
-      {/* DESKTOP SIDEBAR */}
+      {/* =====================================================
+          SIDEBAR DESKTOP
+          ===================================================== */}
 
       <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/[0.08] bg-[#080916]/90 backdrop-blur-2xl lg:flex lg:flex-col">
 
         {/* LOGO */}
 
         <div className="flex h-20 items-center border-b border-white/[0.08] px-6">
-
           <Link
             href="/admin"
             className="flex items-center gap-3"
           >
-
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 ring-1 ring-violet-500/20">
-
               <svg
                 className="h-6 w-6"
                 fill="none"
@@ -129,7 +131,6 @@ export default function AdminSidebar() {
                   d="M12 3l2.09 4.26L19 8l-3.5 3.41.83 4.82L12 14l-4.33 2.23.83-4.82L5 8l4.91-.74L12 3z"
                 />
               </svg>
-
             </div>
 
             <div>
@@ -141,15 +142,12 @@ export default function AdminSidebar() {
                 Panel de control
               </p>
             </div>
-
           </Link>
-
         </div>
 
         {/* NAVEGACIÓN */}
 
         <nav className="flex-1 space-y-2 overflow-y-auto p-4">
-
           <p className="px-3 pb-2 pt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
             Administración
           </p>
@@ -167,7 +165,6 @@ export default function AdminSidebar() {
                     : "border border-transparent text-slate-400 hover:bg-white/[0.04] hover:text-white"
                 }`}
               >
-
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
                     active
@@ -179,7 +176,6 @@ export default function AdminSidebar() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-
                   <p className="truncate text-sm font-semibold">
                     {item.label}
                   </p>
@@ -187,31 +183,25 @@ export default function AdminSidebar() {
                   <p className="mt-0.5 truncate text-[11px] text-slate-600 group-hover:text-slate-500">
                     {item.description}
                   </p>
-
                 </div>
 
                 {active && (
                   <div className="h-2 w-2 rounded-full bg-violet-400 shadow-lg shadow-violet-400/50" />
                 )}
-
               </Link>
             );
           })}
-
         </nav>
 
-        {/* USUARIO / LOGOUT */}
+        {/* LOGOUT DESKTOP */}
 
         <div className="border-t border-white/[0.08] p-4">
-
           <button
             type="button"
             onClick={handleLogout}
             className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left text-slate-400 transition hover:border-red-500/10 hover:bg-red-500/5 hover:text-red-300"
           >
-
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.03] text-slate-500 transition group-hover:bg-red-500/10 group-hover:text-red-400">
-
               <svg
                 className="h-5 w-5"
                 fill="none"
@@ -225,7 +215,6 @@ export default function AdminSidebar() {
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"
                 />
               </svg>
-
             </div>
 
             <div>
@@ -237,12 +226,87 @@ export default function AdminSidebar() {
                 Salir del panel
               </p>
             </div>
+          </button>
+        </div>
+      </aside>
 
+      {/* =====================================================
+          NAVEGACIÓN MOBILE
+          ===================================================== */}
+
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.08] bg-[#080916]/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-2xl lg:hidden">
+
+        <div className="mx-auto flex max-w-md items-center justify-around">
+
+          {menuItems.map((item) => {
+            const active = isActive(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 transition-all ${
+                  active
+                    ? "text-violet-400"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                    active
+                      ? "bg-violet-500/15"
+                      : "bg-transparent"
+                  }`}
+                >
+                  {item.icon}
+                </div>
+
+                <span
+                  className={`max-w-full truncate text-[10px] font-semibold ${
+                    active ? "text-violet-400" : "text-slate-500"
+                  }`}
+                >
+                  {item.shortLabel}
+                </span>
+
+                {active && (
+                  <div className="absolute bottom-1 h-0.5 w-8 rounded-full bg-violet-400" />
+                )}
+              </Link>
+            );
+          })}
+
+          {/* LOGOUT MOBILE */}
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-slate-500 transition hover:text-red-400"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"
+                />
+              </svg>
+            </div>
+
+            <span className="text-[10px] font-semibold">
+              Salir
+            </span>
           </button>
 
         </div>
-
-      </aside>
+      </nav>
     </>
   );
 }
+

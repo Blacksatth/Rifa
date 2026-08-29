@@ -85,7 +85,6 @@ export default function AdminLayout({
 
           setAuthorized(true);
           setChecking(false);
-
         } catch (error) {
           console.error(
             "Error verificando administrador:",
@@ -207,7 +206,22 @@ export default function AdminLayout({
 
           {/* PÁGINA */}
 
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <main
+            className="
+              flex-1
+              min-w-0
+              overflow-x-hidden
+              px-3
+              py-4
+              pb-24
+              sm:px-6
+              sm:py-6
+              sm:pb-24
+              lg:px-8
+              lg:py-6
+              lg:pb-6
+            "
+          >
 
             <div className="mx-auto w-full max-w-7xl">
 
@@ -224,3 +238,4 @@ export default function AdminLayout({
     </div>
   );
 }
+
