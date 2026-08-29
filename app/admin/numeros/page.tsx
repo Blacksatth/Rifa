@@ -191,39 +191,7 @@ export default function AdminNumerosPage() {
 
       {/* ENCABEZADO */}
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl shadow-2xl">
-
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-          <div>
-
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400">
-              Rifa activa
-            </p>
-
-            <h1 className="mt-1 text-xl font-bold text-white">
-              Números vendidos
-            </h1>
-
-            <p className="mt-2 text-sm text-slate-500">
-              Busca y administra los participantes
-              de tu rifa.
-            </p>
-
-          </div>
-
-          <div className="w-full lg:w-80">
-
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-            />
-
-          </div>
-
-        </div>
-
-      </section>
+     
 
       {/* TABLA */}
 
