@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   addDoc,
   collection,
@@ -15,6 +15,21 @@ import { db } from "@/lib/firebase";
 import { Raffle } from "@/lib/types";
 import RaffleFormFields from "./RaffleFormFields";
 import RafflePreview from "./RafflePreview";
+
+const MAX_NUMBERS = 10000;
+const BATCH_LIMIT = 500;
+
+// ==========================================
+// FORMATEAR DINERO (fuera del componente: no depende de props/estado)
+// ==========================================
+function formatCOP(value: number) {
+  return Number(value || 0).toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
 
 export default function RaffleForm({ existing }: { existing: Raffle | null }) {
   // ==========================================
@@ -51,6 +66,20 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
   }, [file]);
 
   // ==========================================
+  // AVISO AL CERRAR LA PESTAÑA MIENTRAS SE PROCESA
+  // (crear/eliminar una rifa grande puede tardar por los batches de Firestore)
+  // ==========================================
+  useEffect(() => {
+    if (!loading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [loading]);
+
+  // ==========================================
   // SUBIR IMAGEN A CLOUDINARY
   // ==========================================
   async function uploadToCloudinary(file: File): Promise<string> {
@@ -83,24 +112,161 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
   }
 
   // ==========================================
-  // FORMATEAR DINERO
-  // ==========================================
-  function formatCOP(value: number) {
-    return Number(value || 0).toLocaleString("es-CO", {
-      style: "currency",
-      currency: "COP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  }
-
-  // ==========================================
   // VALOR TOTAL (memoizado)
   // ==========================================
   const totalValue = useMemo(
     () => Number(total || 0) * Number(price || 0),
     [total, price]
   );
+
+  // ==========================================
+  // GENERAR NÚMEROS EN BATCHES, CON PROGRESO
+  // ==========================================
+  async function generateNumbers(raffleId: string, totalNumbers: number, digits: number) {
+    let batch = writeBatch(db);
+    let batchCount = 0;
+
+    for (let i = 0; i < totalNumbers; i++) {
+      const numStr = String(i).padStart(digits, "0");
+      const numberRef = doc(db, "raffles", raffleId, "numbers", numStr);
+
+      batch.set(numberRef, {
+        number: numStr,
+        status: "available",
+        buyerName: null,
+        buyerPhone: null,
+      });
+
+      batchCount++;
+
+      if (batchCount === BATCH_LIMIT || i === totalNumbers - 1) {
+        const currentProgress = 22 + Math.round(((i + 1) / totalNumbers) * 70);
+        setProgress(Math.min(currentProgress, 92));
+        setStep(`Creando números... ${i + 1} / ${totalNumbers}`);
+
+        await batch.commit();
+        batch = writeBatch(db);
+        batchCount = 0;
+      }
+    }
+  }
+
+  // ==========================================
+  // AJUSTAR NÚMEROS AL EDITAR (subir o bajar la cantidad)
+  // ==========================================
+  // Si sube la cantidad: crea los números nuevos como disponibles.
+  // Si baja la cantidad: primero verifica que ninguno de los números que
+  // se eliminarían esté vendido/reservado; si lo está, aborta sin escribir nada.
+  // Si cambia el ancho de dígitos (ej. de 2 a 3 porque pasó de 100 a 1000
+  // números), "renombra" los números que sobreviven al nuevo formato para
+  // que todos queden con el mismo padding, conservando su estado y comprador.
+  async function syncNumbersOnEdit(
+    raffleId: string,
+    oldTotal: number,
+    newTotal: number,
+    oldDigits: number,
+    newDigits: number
+  ) {
+    if (newTotal === oldTotal && newDigits === oldDigits) return;
+
+    setStep("Verificando números existentes...");
+    setProgress(25);
+
+    const numbersRef = collection(db, "raffles", raffleId, "numbers");
+    const snapshot = await getDocs(numbersRef);
+
+    // Índice numérico -> datos actuales, sin importar el padding con el
+    // que estén guardados hoy.
+    const byIndex = new Map<
+      number,
+      { status: string; buyerName: string | null; buyerPhone: string | null }
+    >();
+    snapshot.docs.forEach((d) => {
+      const idx = Number(d.id);
+      if (!Number.isNaN(idx)) {
+        const data = d.data() as any;
+        byIndex.set(idx, {
+          status: data?.status ?? "available",
+          buyerName: data?.buyerName ?? null,
+          buyerPhone: data?.buyerPhone ?? null,
+        });
+      }
+    });
+
+    // No se puede reducir si alguno de los números a eliminar ya está vendido/reservado.
+    if (newTotal < oldTotal) {
+      const taken: number[] = [];
+      for (let i = newTotal; i < oldTotal; i++) {
+        const entry = byIndex.get(i);
+        if (entry && entry.status !== "available") taken.push(i);
+      }
+      if (taken.length > 0) {
+        const example = String(taken[0]).padStart(oldDigits, "0");
+        throw new Error(
+          `No puedes reducir a ${newTotal} números: ${taken.length} de los que se eliminarían ya están vendidos o reservados (ej. el ${example}). Libéralos primero o elige una cantidad mayor.`
+        );
+      }
+    }
+
+    setStep("Ajustando números...");
+
+    let batch = writeBatch(db);
+    let batchCount = 0;
+    const flush = async () => {
+      if (batchCount > 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+        batchCount = 0;
+      }
+    };
+
+    // 1. Borrar los que quedan fuera del nuevo rango.
+    for (let i = newTotal; i < oldTotal; i++) {
+      const oldId = String(i).padStart(oldDigits, "0");
+      batch.delete(doc(db, "raffles", raffleId, "numbers", oldId));
+      batchCount++;
+      if (batchCount >= BATCH_LIMIT) await flush();
+    }
+    await flush();
+
+    // 2. Si cambió el ancho de dígitos, migrar los que sobreviven al nuevo formato.
+    if (newDigits !== oldDigits) {
+      const survivingCount = Math.min(oldTotal, newTotal);
+      for (let i = 0; i < survivingCount; i++) {
+        const oldId = String(i).padStart(oldDigits, "0");
+        const newId = String(i).padStart(newDigits, "0");
+        if (oldId === newId) continue;
+
+        const entry = byIndex.get(i) ?? { status: "available", buyerName: null, buyerPhone: null };
+        batch.set(doc(db, "raffles", raffleId, "numbers", newId), {
+          number: newId,
+          status: entry.status,
+          buyerName: entry.buyerName,
+          buyerPhone: entry.buyerPhone,
+        });
+        batch.delete(doc(db, "raffles", raffleId, "numbers", oldId));
+        batchCount += 2;
+        if (batchCount >= BATCH_LIMIT) await flush();
+      }
+      await flush();
+    }
+
+    // 3. Crear los números nuevos si subió la cantidad.
+    for (let i = oldTotal; i < newTotal; i++) {
+      const newId = String(i).padStart(newDigits, "0");
+      batch.set(doc(db, "raffles", raffleId, "numbers", newId), {
+        number: newId,
+        status: "available",
+        buyerName: null,
+        buyerPhone: null,
+      });
+      batchCount++;
+      if (batchCount >= BATCH_LIMIT) await flush();
+    }
+    await flush();
+
+    setProgress(90);
+  }
 
   // ==========================================
   // GUARDAR / EDITAR RIFA
@@ -113,14 +279,20 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
     setStep("");
     setProgress(0);
 
+    // Normalizamos primero, porque el estado puede llegar como string
+    // desde algunos inputs controlados.
+    const totalNum = Number(total);
+    const priceNum = Number(price);
+
     // VALIDACIONES
     if (!name.trim()) return setError("Escribe el nombre de la rifa.");
     if (!prizeName.trim()) return setError("Escribe el nombre del premio.");
-    if (!Number.isInteger(total) || total < 2)
+    if (!Number.isInteger(totalNum) || totalNum < 2)
       return setError("La cantidad de números debe ser un número entero mayor a 1.");
-    if (total > 10000)
-      return setError("La cantidad máxima es de 10.000 números por rifa.");
-    if (!price || price <= 0) return setError("El precio debe ser mayor que 0.");
+    if (totalNum > MAX_NUMBERS)
+      return setError(`La cantidad máxima es de ${MAX_NUMBERS.toLocaleString("es-CO")} números por rifa.`);
+    if (!Number.isFinite(priceNum) || priceNum <= 0)
+      return setError("El precio debe ser mayor que 0.");
     if (!drawDate) return setError("Selecciona la fecha del sorteo.");
     if (!drawTime) return setError("Selecciona la hora del sorteo.");
     if (!drawMethod.trim()) return setError("Especifica cómo se realizará el sorteo.");
@@ -153,14 +325,14 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
         setProgress(18);
       }
 
-      const digits = Math.max(2, String(total - 1).length);
+      const digits = Math.max(2, String(totalNum - 1).length);
 
       const raffleData = {
         name: name.trim(),
         prizeName: prizeName.trim(),
         prizeImageUrl: imageUrl,
-        totalNumbers: total,
-        price: Number(price),
+        totalNumbers: totalNum,
+        price: priceNum,
         digits,
         drawDate,
         drawTime,
@@ -170,10 +342,23 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
         updatedAt: serverTimestamp(),
       };
 
-      // 3. EDITAR
+      // 2. EDITAR
       if (existing?.id) {
+        const oldTotal = existing.totalNumbers;
+        const oldDigits = (existing as any).digits ?? Math.max(2, String(oldTotal - 1).length);
+
+        if (totalNum !== oldTotal || digits !== oldDigits) {
+          try {
+            await syncNumbersOnEdit(existing.id, oldTotal, totalNum, oldDigits, digits);
+          } catch (err: any) {
+            // No tocamos el documento de la rifa si el ajuste de números falló
+            // (p.ej. porque intentabas reducir números ya vendidos).
+            throw new Error(err?.message || "No se pudo ajustar la cantidad de números.");
+          }
+        }
+
         setStep("Guardando cambios...");
-        setProgress(40);
+        setProgress(95);
         await updateDoc(doc(db, "raffles", existing.id), raffleData);
         setProgress(100);
         setSuccess("¡Rifa actualizada correctamente!");
@@ -181,51 +366,48 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
         return;
       }
 
-      // 4. CREAR NUEVA RIFA
+      // 3. CREAR NUEVA RIFA
       setStep("Creando rifa...");
       setProgress(22);
 
-      const raffleRef = await addDoc(collection(db, "raffles"), {
-        ...raffleData,
-        active: true,
-        createdAt: serverTimestamp(),
-      });
-
-      // 5. CREAR NÚMEROS CON PROGRESO REAL
-      setStep("Generando números...");
-      let batch = writeBatch(db);
-      let batchCount = 0;
-      const totalNumbers = total;
-
-      for (let i = 0; i < totalNumbers; i++) {
-        const numStr = String(i).padStart(digits, "0");
-        const numberRef = doc(db, "raffles", raffleRef.id, "numbers", numStr);
-
-        batch.set(numberRef, {
-          number: numStr,
-          status: "available",
-          buyerName: null,
-          buyerPhone: null,
+      let raffleId: string;
+      try {
+        const raffleRef = await addDoc(collection(db, "raffles"), {
+          ...raffleData,
+          active: true,
+          createdAt: serverTimestamp(),
         });
+        raffleId = raffleRef.id;
+      } catch (err: any) {
+        throw new Error(
+          err?.code === "permission-denied"
+            ? "Firebase rechazó la creación de la rifa. Revisa las reglas de Firestore."
+            : err?.message || "No se pudo crear el registro de la rifa."
+        );
+      }
 
-        batchCount++;
-
-        // Actualizar progreso cada ~2% o cada 500
-        if (batchCount === 500 || i === totalNumbers - 1) {
-          const currentProgress = 22 + Math.round(((i + 1) / totalNumbers) * 70);
-          setProgress(Math.min(currentProgress, 92));
-          setStep(`Creando números... ${i + 1} / ${totalNumbers}`);
-
-          await batch.commit();
-          batch = writeBatch(db);
-          batchCount = 0;
+      // 4. CREAR NÚMEROS CON PROGRESO REAL
+      setStep("Generando números...");
+      try {
+        await generateNumbers(raffleId, totalNum, digits);
+      } catch (err: any) {
+        // Rollback: si fallan los números, no dejamos una rifa huérfana
+        // sin (o con solo parte de) sus números.
+        try {
+          await deleteDoc(doc(db, "raffles", raffleId));
+        } catch {
+          // Si ni el rollback funciona, al menos avisamos con detalle abajo.
         }
+        throw new Error(
+          (err?.message ? err.message + " " : "") +
+            "No se pudieron generar los números y se revirtió la creación de la rifa. Intenta de nuevo."
+        );
       }
 
       setProgress(100);
       setStep("");
       setSuccess(
-        `¡Rifa creada con éxito! ${total} números generados • ${formatCOP(Number(price))} c/u`
+        `¡Rifa creada con éxito! ${totalNum} números generados • ${formatCOP(priceNum)} c/u`
       );
 
       // Limpiar formulario
@@ -289,7 +471,7 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
         batch.delete(snapshot.docs[i].ref);
         batchCount++;
 
-        if (batchCount === 500 || i === totalDocs - 1) {
+        if (batchCount === BATCH_LIMIT || i === totalDocs - 1) {
           setProgress(15 + Math.round(((i + 1) / Math.max(totalDocs, 1)) * 70));
           await batch.commit();
           batch = writeBatch(db);
@@ -315,6 +497,9 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
       setLoading(false);
     }
   }
+
+  const dismissError = useCallback(() => setError(""), []);
+  const dismissSuccess = useCallback(() => setSuccess(""), []);
 
   // ==========================================
   // JSX
@@ -357,33 +542,31 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
             className={`flex w-fit items-center gap-2.5 rounded-full border px-4 py-2 transition-all duration-300 ${
               loading
                 ? "border-amber-500/30 bg-amber-500/10"
-                : success
-                ? "border-emerald-500/30 bg-emerald-500/10"
                 : "border-emerald-500/20 bg-emerald-500/10"
             }`}
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                loading
-                  ? "animate-pulse bg-amber-400"
-                  : success
-                  ? "bg-emerald-400"
-                  : "animate-pulse bg-emerald-400"
+                loading ? "animate-pulse bg-amber-400" : "animate-pulse bg-emerald-400"
               }`}
             />
             <span
               className={`text-[11px] font-bold tracking-wider ${
-                loading ? "text-amber-300" : success ? "text-emerald-300" : "text-emerald-400"
+                loading ? "text-amber-300" : "text-emerald-400"
               }`}
             >
-              {loading ? "PROCESANDO" : success ? "LISTO" : "LISTO"}
+              {loading ? "PROCESANDO" : "LISTO"}
             </span>
           </div>
         </div>
 
         {/* ERROR */}
         {error && (
-          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 backdrop-blur-sm">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 backdrop-blur-sm"
+          >
             <div className="flex gap-3.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
                 <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,7 +578,9 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
                 <p className="mt-1 text-sm leading-relaxed text-red-300/80">{error}</p>
               </div>
               <button
-                onClick={() => setError("")}
+                type="button"
+                onClick={dismissError}
+                aria-label="Cerrar mensaje de error"
                 className="shrink-0 rounded-lg p-1.5 text-red-400/60 transition hover:bg-red-500/10 hover:text-red-300"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,7 +593,11 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
 
         {/* SUCCESS */}
         {success && !loading && (
-          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 backdrop-blur-sm">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 backdrop-blur-sm"
+          >
             <div className="flex gap-3.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
                 <svg className="h-5 w-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,7 +609,9 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
                 <p className="mt-1 text-sm leading-relaxed text-emerald-300/80">{success}</p>
               </div>
               <button
-                onClick={() => setSuccess("")}
+                type="button"
+                onClick={dismissSuccess}
+                aria-label="Cerrar mensaje de éxito"
                 className="shrink-0 rounded-lg p-1.5 text-emerald-400/60 transition hover:bg-emerald-500/10 hover:text-emerald-300"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -433,7 +624,11 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
 
         {/* PROGRESO REAL */}
         {loading && (
-          <div className="mb-7 overflow-hidden rounded-2xl border border-violet-500/20 bg-violet-500/5 backdrop-blur-sm">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-7 overflow-hidden rounded-2xl border border-violet-500/20 bg-violet-500/5 backdrop-blur-sm"
+          >
             <div className="flex items-center justify-between gap-3 px-5 py-3.5">
               <div className="flex items-center gap-3">
                 <div className="relative">
@@ -483,6 +678,7 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
               loading={loading}
               totalValue={totalValue}
               formatCOP={formatCOP}
+              isEditing={!!existing}
             />
 
             {/* BOTONES DE ACCIÓN */}
@@ -491,7 +687,7 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
                 type="button"
                 disabled={loading}
                 onClick={handleCreate}
-                className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-6 py-4.5 font-semibold text-white shadow-xl shadow-violet-600/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-violet-600/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-6 py-4 font-semibold text-white shadow-xl shadow-violet-600/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-violet-600/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
                 {/* Shine effect */}
                 <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
@@ -529,7 +725,7 @@ export default function RaffleForm({ existing }: { existing: Raffle | null }) {
                   className="group w-full rounded-2xl border border-red-500/25 bg-red-500/10 px-6 py-3.5 font-semibold text-red-400 transition-all duration-300 hover:border-red-500/40 hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="flex items-center justify-center gap-2">
-                    <svg className="h-4.5 w-4.5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     Eliminar rifa

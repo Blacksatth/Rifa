@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 interface RaffleFormFieldsProps {
   name: string;
   setName: (v: string) => void;
@@ -35,6 +37,11 @@ interface RaffleFormFieldsProps {
 
   totalValue: number;
   formatCOP: (value: number) => string;
+
+  // Si es true, estamos editando una rifa que ya existe: la cantidad de
+  // números no se puede cambiar porque la subcolección "numbers" ya fue
+  // generada con ese tamaño y no se regenera al editar.
+  isEditing?: boolean;
 }
 
 export default function RaffleFormFields({
@@ -61,15 +68,61 @@ export default function RaffleFormFields({
   loading,
   totalValue,
   formatCOP,
-}: RaffleFormFieldsProps) {
+  isEditing = false,
+}: RaffleFormFieldsProps) {// Buffers de texto para los inputs numéricos. Sin esto, al borrar el
+  // campo por completo `Number("")` se vuelve 0, React repinta un "0" en
+  // el input a mitad de la escritura, y el siguiente dígito que tecleas
+  // queda insertado antes de ese "0" (por eso "100" terminaba en "0100").
+  // Aquí el input muestra lo que el usuario escribe tal cual, y solo se
+  // avisa al padre (setTotal/setPrice) cuando el texto es un número válido.
+  const [totalText, setTotalText] = useState(String(total));
+  const [priceText, setPriceText] = useState(String(price));
+
+  // Resincroniza si el valor cambia desde afuera del input (reset del
+  // formulario tras crear una rifa, o al cargar los datos de "existing").
+  useEffect(() => {
+    setTotalText(String(total));
+  }, [total]);
+
+  useEffect(() => {
+    setPriceText(String(price));
+  }, [price]);
+
+  function handleTotalChange(raw: string) {
+    setTotalText(raw);
+    if (raw === "") return; // no forzamos a 0 mientras el usuario borra
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed)) setTotal(parsed);
+  }
+
+  function handleTotalBlur() {
+    if (totalText === "" || Number.isNaN(Number(totalText))) {
+      setTotalText(String(total)); // vuelve al último valor válido
+    }
+  }
+
+  function handlePriceChange(raw: string) {
+    setPriceText(raw);
+    if (raw === "") return;
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed)) setPrice(parsed);
+  }
+
+  function handlePriceBlur() {
+    if (priceText === "" || Number.isNaN(Number(priceText))) {
+      setPriceText(String(price));
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* NOMBRE */}
       <div>
-        <label className="mb-2 block text-sm font-semibold text-slate-300">
+        <label htmlFor="raffle-name" className="mb-2 block text-sm font-semibold text-slate-300">
           Nombre de la rifa
         </label>
         <input
+          id="raffle-name"
           type="text"
           value={name}
           disabled={loading}
@@ -81,10 +134,11 @@ export default function RaffleFormFields({
 
       {/* PREMIO */}
       <div>
-        <label className="mb-2 block text-sm font-semibold text-slate-300">
+        <label htmlFor="raffle-prize" className="mb-2 block text-sm font-semibold text-slate-300">
           Nombre del premio
         </label>
         <input
+          id="raffle-prize"
           type="text"
           value={prizeName}
           disabled={loading}
@@ -97,25 +151,29 @@ export default function RaffleFormFields({
       {/* NÚMEROS + PRECIO */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-300">
+          <label htmlFor="raffle-total" className="mb-2 block text-sm font-semibold text-slate-300">
             Cantidad de números
           </label>
           <input
+            id="raffle-total"
             type="number"
             min={2}
             max={10000}
-            value={total}
+            value={totalText}
             disabled={loading}
-            onChange={(e) => setTotal(Number(e.target.value))}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+            onChange={(e) => handleTotalChange(e.target.value)}
+            onBlur={handleTotalBlur}
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <p className="mt-2 text-xs text-slate-500">
-            Ej. 100 números → 00 hasta 99
+            {isEditing
+              ? "Si la subes, se crean números nuevos disponibles. Si la bajas, no se pueden quitar números ya vendidos o reservados."
+              : "Ej. 100 números → 00 hasta 99"}
           </p>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-300">
+          <label htmlFor="raffle-price" className="mb-2 block text-sm font-semibold text-slate-300">
             Precio por número
           </label>
           <div className="relative">
@@ -123,17 +181,19 @@ export default function RaffleFormFields({
               $
             </span>
             <input
+              id="raffle-price"
               type="number"
-              min={0.01}
-              step={0.01}
-              value={price}
+              min={1}
+              step={1}
+              value={priceText}
               disabled={loading}
-              onChange={(e) => setPrice(Number(e.target.value))}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3.5 pl-9 pr-4 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+              onChange={(e) => handlePriceChange(e.target.value)}
+              onBlur={handlePriceBlur}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3.5 pl-9 pr-4 text-sm text-white outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Precio por participación.
+            Precio por participación, en pesos (sin centavos).
           </p>
         </div>
       </div>
@@ -151,43 +211,46 @@ export default function RaffleFormFields({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-300">
+            <label htmlFor="raffle-draw-date" className="mb-2 block text-sm font-semibold text-slate-300">
               📅 Fecha
             </label>
             <input
+              id="raffle-draw-date"
               type="date"
               value={drawDate}
               disabled={loading}
               onChange={(e) => setDrawDate(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-300">
+            <label htmlFor="raffle-draw-time" className="mb-2 block text-sm font-semibold text-slate-300">
               🕐 Hora
             </label>
             <input
+              id="raffle-draw-time"
               type="time"
               value={drawTime}
               disabled={loading}
               onChange={(e) => setDrawTime(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         </div>
 
         <div className="mt-4">
-          <label className="mb-2 block text-sm font-semibold text-slate-300">
+          <label htmlFor="raffle-draw-method" className="mb-2 block text-sm font-semibold text-slate-300">
             🎰 Método del sorteo
           </label>
           <input
+            id="raffle-draw-method"
             type="text"
             value={drawMethod}
             disabled={loading}
             placeholder="Ej. Lotería de Medellín"
             onChange={(e) => setDrawMethod(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <p className="mt-2 text-xs text-slate-500">
             Ej. Lotería de Medellín, Lotería de Bogotá, sorteo propio, etc.
@@ -197,17 +260,18 @@ export default function RaffleFormFields({
 
       {/* DESCRIPCIÓN */}
       <div>
-        <label className="mb-2 block text-sm font-semibold text-slate-300">
+        <label htmlFor="raffle-description" className="mb-2 block text-sm font-semibold text-slate-300">
           Descripción de la rifa
         </label>
         <textarea
+          id="raffle-description"
           value={description}
           disabled={loading}
           rows={4}
           maxLength={500}
           placeholder="Describe la rifa, las condiciones y cómo se elegirá al ganador..."
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm leading-6 text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm leading-6 text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="mt-2 text-right text-xs text-slate-500">
           {description.length}/500
@@ -216,16 +280,17 @@ export default function RaffleFormFields({
 
       {/* WHATSAPP */}
       <div>
-        <label className="mb-2 block text-sm font-semibold text-slate-300">
+        <label htmlFor="raffle-whatsapp" className="mb-2 block text-sm font-semibold text-slate-300">
           📱 WhatsApp de contacto
         </label>
         <input
+          id="raffle-whatsapp"
           type="tel"
           value={whatsapp}
           disabled={loading}
           placeholder="Ej. 3001234567"
           onChange={(e) => setWhatsapp(e.target.value)}
-          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:opacity-60"
+          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white placeholder:text-slate-600 outline-none transition hover:border-slate-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="mt-2 text-xs text-slate-500">
           Este número podrá mostrarse como contacto para los participantes.
