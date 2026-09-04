@@ -101,4 +101,12 @@ export interface RaffleNumber {
    * Se usa `getExpirationTimeMs()` para normalizar a milisegundos.
    */
   reservationExpiresAt?: unknown;
+
+  /**
+   * Timestamp de cuándo el administrador marcó el número como vendido
+   * (después de confirmar el pago). Se escribe desde el panel admin
+   * (`NumbersTable.markSold`) y se limpia al liberar (`confirmRelease`).
+   * Tipo `unknown` por la misma razón que `reservedAt`.
+   */
+  soldAt?: unknown;
 }

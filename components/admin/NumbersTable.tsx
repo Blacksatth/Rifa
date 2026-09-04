@@ -13,9 +13,17 @@ const display = Space_Grotesk({
   variable: "--font-ticket",
 });
 
+type Status = "available" | "reserved" | "sold";
+
+export type NumbersTableFilter = {
+  search: string;
+  status: "all" | Status;
+};
+
 type Props = {
   raffleId: string;
   numbers: RaffleNumber[];
+  onFilterChange?: (filter: NumbersTableFilter) => void;
 };
 
 /**
@@ -35,7 +43,9 @@ type Props = {
  * @see components/admin/SearchBar.tsx para el componente de búsqueda
  */
 
-type Status = "available" | "reserved" | "sold";
+/**
+ * Estados posibles de un número de la rifa.
+ */
 
 const STATUS_CONFIG: Record<
   Status,
@@ -89,12 +99,16 @@ type ModalState =
 
 let toastSeq = 0;
 
-export default function NumbersTable({ raffleId, numbers }: Props) {
+export default function NumbersTable({ raffleId, numbers, onFilterChange }: Props) {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [modal, setModal] = useState<ModalState>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+
+  useEffect(() => {
+    onFilterChange?.({ search, status: statusFilter });
+  }, [search, statusFilter, onFilterChange]);
 
   function pushToast(kind: ToastKind, message: string) {
     const id = ++toastSeq;

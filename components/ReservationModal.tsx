@@ -14,6 +14,7 @@ import {
   releaseReservation as releaseReservationAction,
 } from "@/lib/actions";
 import toast from "react-hot-toast";
+import { celebrate } from "@/lib/celebrate";
 
 const getExpirationTimeMs = (
   value: unknown
@@ -111,6 +112,29 @@ export default function ReservationModal({
 
   const [checkingReservation, setCheckingReservation] =
     useState(true);
+
+  // ============================================================
+  // ZOOM DEL QR
+  // ============================================================
+
+  const [qrOpen, setQrOpen] = useState(false);
+
+  // ============================================================
+  // ERRORES DE VALIDACIÓN DE CAMPOS
+  // ============================================================
+
+  const [nameError, setNameError] =
+    useState<string | null>(null);
+
+  const [phoneError, setPhoneError] =
+    useState<string | null>(null);
+
+  // ============================================================
+  // TAB DE MÉTODO DE PAGO ACTIVO
+  // ============================================================
+
+  const [activeTab, setActiveTab] =
+    useState<"qr" | "bancolombia" | "nequi">("qr");
 
   // ============================================================
   // INFORMACIÓN RIFA
@@ -361,6 +385,28 @@ export default function ReservationModal({
   ]);
 
   // ============================================================
+  // CERRAR QR CON TECLA ESC
+  // ============================================================
+
+  useEffect(() => {
+    if (!qrOpen) {
+      return;
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setQrOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [qrOpen]);
+
+  // ============================================================
   // CONTADOR
   // ============================================================
 
@@ -498,38 +544,29 @@ export default function ReservationModal({
       return;
     }
 
-    if (!cleanName) {
-      toast.error(
-        "Ingresa tu nombre completo"
-      );
+    const nextNameError = !cleanName
+      ? "Ingresa tu nombre completo"
+      : cleanName.length < 3
+        ? "El nombre debe tener al menos 3 caracteres"
+        : null;
+
+    const nextPhoneError = !cleanPhone
+      ? "Ingresa tu número de teléfono"
+      : cleanPhone.length < 7
+        ? "Ingresa un teléfono válido"
+        : null;
+
+    setNameError(nextNameError);
+    setPhoneError(nextPhoneError);
+
+    if (nextNameError) {
+      toast.error(nextNameError);
 
       return;
     }
 
-    if (
-      cleanName.length < 3
-    ) {
-      toast.error(
-        "El nombre debe tener al menos 3 caracteres"
-      );
-
-      return;
-    }
-
-    if (!cleanPhone) {
-      toast.error(
-        "Ingresa tu número de teléfono"
-      );
-
-      return;
-    }
-
-    if (
-      cleanPhone.length < 7
-    ) {
-      toast.error(
-        "Ingresa un teléfono válido"
-      );
+    if (nextPhoneError) {
+      toast.error(nextPhoneError);
 
       return;
     }
@@ -589,8 +626,11 @@ export default function ReservationModal({
 
       setReserved(true);
 
+      celebrate();
+
       toast.success(
-        "¡Número reservado correctamente!"
+        `¡Tu número ${number.number} fue reservado con éxito! Realiza el pago para confirmarlo.`,
+        { duration: 4000 }
       );
     } catch (error) {
       console.error(
@@ -611,6 +651,24 @@ export default function ReservationModal({
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ============================================================
+  // COPIAR AL PORTAPAPELES
+  // ============================================================
+
+  async function handleCopy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(
+        "✅ Copiado al portapapeles"
+      );
+    } catch (error) {
+      console.error("Error copiando al portapapeles:", error);
+      toast.error(
+        "No se pudo copiar. Copia manualmente."
+      );
     }
   }
 
@@ -884,6 +942,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
   // ============================================================
 
   return (
+    <>
     <div
       className="
         fixed inset-0 z-50
@@ -1133,211 +1192,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
         >
           {reserved ? (
             <>
-              {/* ÉXITO */}
-
-              <div
-                className="
-                  rounded-2xl
-                  border
-                  border-emerald-500/20
-                  bg-emerald-500/[0.06]
-                  p-4
-                  text-center
-                "
-              >
-                <div
-                  className="
-                    mx-auto
-                    mb-3
-                    flex
-                    h-12
-                    w-12
-                    items-center
-                    justify-center
-                    rounded-full
-                    border
-                    border-emerald-500/30
-                    bg-emerald-500/10
-                  "
-                >
-                  <svg
-                    className="
-                      h-6
-                      w-6
-                      text-emerald-400
-                    "
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-
-                <h3
-                  className="
-                    text-lg
-                    font-black
-                    text-white
-                  "
-                >
-                  {reservationExpired
-                    ? "La reserva ha expirado"
-                    : "¡Tu número está reservado!"}
-                </h3>
-
-                <p
-                  className="
-                    mt-1
-                    text-xs
-                    leading-5
-                    text-slate-400
-                  "
-                >
-                  {reservationExpired
-                    ? "El tiempo para realizar el pago terminó."
-                    : "Realiza el pago dentro del tiempo indicado para conservar tu número."}
-                </p>
-              </div>
-
-              {/* NÚMERO / PRECIO */}
-
-              <div
-                className="
-                  grid
-                  grid-cols-2
-                  gap-3
-                "
-              >
-                <div
-                  className="
-                    rounded-xl
-                    border
-                    border-white/[0.08]
-                    bg-white/[0.03]
-                    p-3
-                  "
-                >
-                  <p
-                    className="
-                      text-[9px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.12em]
-                      text-slate-500
-                    "
-                  >
-                    🎟️ Número
-                  </p>
-
-                  <p
-                    className="
-                      mt-1
-                      font-mono
-                      text-2xl
-                      font-black
-                      tracking-wider
-                      text-white
-                    "
-                  >
-                    {number.number}
-                  </p>
-                </div>
-
-                <div
-                  className="
-                    rounded-xl
-                    border
-                    border-white/[0.08]
-                    bg-white/[0.03]
-                    p-3
-                  "
-                >
-                  <p
-                    className="
-                      text-[9px]
-                      font-semibold
-                      uppercase
-                      tracking-[0.12em]
-                      text-slate-500
-                    "
-                  >
-                    💰 Valor
-                  </p>
-
-                  <p
-                    className="
-                      mt-1
-                      text-lg
-                      font-black
-                      text-emerald-400
-                    "
-                  >
-                    {formatPrice(
-                      ticketPrice
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* CONTADOR */}
-
-              {!reservationExpired ? (
-                <div
-                  className="
-                    rounded-xl
-                    border
-                    border-amber-500/20
-                    bg-amber-500/[0.06]
-                    p-4
-                    text-center
-                  "
-                >
-                  <p
-                    className="
-                      text-[10px]
-                      font-bold
-                      uppercase
-                      tracking-[0.14em]
-                      text-amber-400
-                    "
-                  >
-                    ⏱️ Tiempo para realizar
-                    el pago
-                  </p>
-
-                  <p
-                    className="
-                      mt-1
-                      font-mono
-                      text-3xl
-                      font-black
-                      tracking-wider
-                      text-white
-                    "
-                  >
-                    {formatTime(
-                      timeLeft
-                    )}
-                  </p>
-
-                  <p
-                    className="
-                      mt-1
-                      text-[10px]
-                      text-slate-500
-                    "
-                  >
-                    Tu reserva tiene una
-                    duración de 30 minutos.
-                  </p>
-                </div>
-              ) : (
+              {reservationExpired ? (
                 <div
                   className="
                     rounded-xl
@@ -1348,19 +1203,14 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     text-center
                   "
                 >
-                  <div className="text-2xl">
-                    ⏰
-                  </div>
-
                   <p
                     className="
-                      mt-1
                       text-sm
                       font-bold
                       text-red-400
                     "
                   >
-                    Tiempo agotado
+                    ⏰ La reserva ha expirado
                   </p>
 
                   <p
@@ -1371,17 +1221,231 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       text-slate-500
                     "
                   >
-                    La reserva ya no puede
-                    utilizarse para realizar
-                    el pago.
+                    El tiempo para realizar el
+                    pago terminó. Tu número fue
+                    liberado.
                   </p>
                 </div>
+              ) : (
+                <>
+                  {/* COMPRADOR */}
+
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-2.5
+                      rounded-xl
+                      border
+                      border-violet-500/20
+                      bg-violet-500/[0.06]
+                      px-3.5
+                      py-3
+                    "
+                  >
+                    <div
+                      className="
+                        flex
+                        h-10
+                        w-10
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                        border
+                        border-violet-500/25
+                        bg-violet-500/10
+                        text-base
+                      "
+                    >
+                      👤
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.12em]
+                          text-violet-400/80
+                        "
+                      >
+                        Comprador
+                      </p>
+
+                      <p
+                        className="
+                          truncate
+                          text-sm
+                          font-bold
+                          text-white
+                        "
+                      >
+                        {name}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.1em]
+                          text-slate-500
+                        "
+                      >
+                        Teléfono
+                      </p>
+
+                      <p
+                        className="
+                          text-xs
+                          font-semibold
+                          text-slate-200
+                        "
+                      >
+                        {phone}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* NÚMERO / PRECIO / CONTADOR */}
+
+                  <div
+                    className="
+                      grid
+                      grid-cols-2
+                      gap-3
+                    "
+                  >
+                    <div
+                      className="
+                        rounded-xl
+                        border
+                        border-white/[0.08]
+                        bg-white/[0.03]
+                        p-3
+                      "
+                    >
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.12em]
+                          text-slate-500
+                        "
+                      >
+                        🎟️ Número
+                      </p>
+
+                      <p
+                        className="
+                          mt-1
+                          font-mono
+                          text-2xl
+                          font-black
+                          tracking-wider
+                          text-white
+                        "
+                      >
+                        {number.number}
+                      </p>
+                    </div>
+
+                    <div
+                      className="
+                        rounded-xl
+                        border
+                        border-white/[0.08]
+                        bg-white/[0.03]
+                        p-3
+                      "
+                    >
+                      <p
+                        className="
+                          text-[9px]
+                          font-semibold
+                          uppercase
+                          tracking-[0.12em]
+                          text-slate-500
+                        "
+                      >
+                        💰 Valor
+                      </p>
+
+                      <p
+                        className="
+                          mt-1
+                          text-lg
+                          font-black
+                          text-emerald-400
+                        "
+                      >
+                        {formatPrice(
+                          ticketPrice
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CONTADOR COMPACTO */}
+
+                  <div
+                    className="
+                      flex
+                      items-center
+                      justify-center
+                      gap-2.5
+                      rounded-xl
+                      border
+                      border-amber-500/20
+                      bg-amber-500/[0.06]
+                      px-4
+                      py-2.5
+                    "
+                  >
+                    <span className="text-sm">
+                      ⏱️
+                    </span>
+
+                    <p
+                      className="
+                        text-[10px]
+                        font-bold
+                        uppercase
+                        tracking-[0.12em]
+                        text-amber-400
+                      "
+                    >
+                      Tiempo para pagar
+                    </p>
+
+                    <p
+                      className="
+                        font-mono
+                        text-lg
+                        font-black
+                        tracking-wider
+                        text-white
+                      "
+                    >
+                      {formatTime(
+                        timeLeft
+                      )}
+                    </p>
+                  </div>
+                </>
               )}
 
               {/* PAGOS */}
 
               {!reservationExpired && (
                 <>
+                  {/* ENCABEZADO PAGOS */}
+
                   <div className="text-center">
                     <p
                       className="
@@ -1390,7 +1454,7 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         text-white
                       "
                     >
-                      📲 Realiza tu pago con Bre-B
+                      💳 Elige cómo quieres pagar
                     </p>
 
                     <p
@@ -1400,83 +1464,216 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         text-slate-500
                       "
                     >
-                      Escanea el código QR para
-                      realizar el pago.
+                      Elige el método que prefieras
+                      y realiza tu pago.
                     </p>
                   </div>
 
-                  <div className="flex justify-center">
-                    <div
-                      className="
-                        rounded-2xl
-                        border
-                        border-white/10
-                        bg-white
-                        p-3
-                        shadow-xl
-                        shadow-black/20
-                      "
+                  {/* TABS DE MÉTODOS DE PAGO */}
+
+                  <div
+                    className="
+                      flex
+                      rounded-xl
+                      border
+                      border-white/[0.08]
+                      bg-black/20
+                      p-1
+                    "
+                    role="tablist"
+                    aria-label="Métodos de pago"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "qr"}
+                      onClick={() => setActiveTab("qr")}
+                      className={`
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-1.5
+                        rounded-lg
+                        px-2
+                        py-2
+                        text-[11px]
+                        font-bold
+                        transition-colors
+                        ${
+                          activeTab === "qr"
+                            ? "bg-white/10 text-white"
+                            : "text-slate-500 hover:text-slate-300"
+                        }
+                      `}
                     >
-                      <img
-                        src="/images/qr-breb1.png"
-                        alt="Código QR para realizar el pago mediante Bre-B"
-                        className="
-                          h-72
-                          w-72
-                          max-w-full
-                          object-contain
-                          sm:h-80
-                          sm:w-80
-                        "
-                      />
-                    </div>
+                      📲 Bre-B
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "bancolombia"}
+                      onClick={() => setActiveTab("bancolombia")}
+                      className={`
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-1.5
+                        rounded-lg
+                        px-2
+                        py-2
+                        text-[11px]
+                        font-bold
+                        transition-colors
+                        ${
+                          activeTab === "bancolombia"
+                            ? "bg-white/10 text-white"
+                            : "text-slate-500 hover:text-slate-300"
+                        }
+                      `}
+                    >
+                      🏦 Bancolombia
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === "nequi"}
+                      onClick={() => setActiveTab("nequi")}
+                      className={`
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-1.5
+                        rounded-lg
+                        px-2
+                        py-2
+                        text-[11px]
+                        font-bold
+                        transition-colors
+                        ${
+                          activeTab === "nequi"
+                            ? "bg-white/10 text-white"
+                            : "text-slate-500 hover:text-slate-300"
+                        }
+                      `}
+                    >
+                      💚 Nequi
+                    </button>
                   </div>
 
-                  {/* MÉTODOS DE PAGO */}
+                  {/* CONTENIDO DEL TAB ACTIVO */}
 
-                  <div className="space-y-3">
-                    <div className="text-center">
-                      <p
-                        className="
-                          text-xs
-                          font-bold
-                          text-white
-                        "
-                      >
-                        💳 También puedes pagar
-                        por transferencia
-                      </p>
+                  <div>
+                    {activeTab === "qr" && (
+                      <div className="space-y-3">
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setQrOpen(true)}
+                            aria-label="Ampliar código QR de Bre-B"
+                            className="
+                              group
+                              relative
+                              rounded-2xl
+                              border
+                              border-white/10
+                              bg-white
+                              p-3
+                              shadow-xl
+                              shadow-black/20
+                              transition-transform
+                              duration-200
+                              hover:scale-[1.03]
+                              focus:outline-none
+                              focus:ring-2
+                              focus:ring-violet-500/50
+                            "
+                          >
+                            <img
+                              src="/images/qr-breb1.png"
+                              alt="Código QR para realizar el pago mediante Bre-B"
+                              className="
+                                h-56
+                                w-56
+                                max-w-full
+                                object-contain
+                                sm:h-64
+                                sm:w-64
+                              "
+                            />
 
-                      <p
-                        className="
-                          mt-1
-                          text-[10px]
-                          text-slate-500
-                        "
-                      >
-                        Utiliza cualquiera de
-                        estas opciones para
-                        realizar el pago.
-                      </p>
-                    </div>
+                            <span
+                              className="
+                                absolute
+                                inset-x-0
+                                bottom-3
+                                mx-auto
+                                flex
+                                w-fit
+                                items-center
+                                gap-1
+                                rounded-full
+                                bg-black/70
+                                px-3
+                                py-1
+                                text-[10px]
+                                font-bold
+                                text-white
+                                opacity-0
+                                backdrop-blur-sm
+                                transition-opacity
+                                duration-200
+                                group-hover:opacity-100
+                              "
+                            >
+                              <svg
+                                className="h-3 w-3"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"
+                                />
+                              </svg>
+                              Ampliar
+                            </span>
+                          </button>
+                        </div>
 
-                    <div
-                      className="
-                        grid
-                        grid-cols-1
-                        gap-3
-                        sm:grid-cols-2
-                      "
-                    >
-                      {/* BANCOLOMBIA */}
+                        <p
+                          className="
+                            text-center
+                            text-[11px]
+                            leading-5
+                            text-slate-400
+                          "
+                        >
+                          Escanea el código QR con tu
+                          banco o con la app de{" "}
+                          <span className="font-semibold text-white">
+                            Bre-B
+                          </span>{" "}
+                          para completar el pago.
+                        </p>
+                      </div>
+                    )}
 
+                    {activeTab === "bancolombia" && (
                       <div
                         className="
                           rounded-xl
                           border
                           border-yellow-500/20
                           bg-yellow-500/[0.05]
-                          p-3.5
+                          p-4
                         "
                       >
                         <div
@@ -1489,8 +1686,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                           <div
                             className="
                               flex
-                              h-9
-                              w-9
+                              h-10
+                              w-10
                               shrink-0
                               items-center
                               justify-center
@@ -1504,14 +1701,12 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                             🏦
                           </div>
 
-                          <div className="min-w-0">
+                          <div>
                             <p
                               className="
-                                text-[9px]
+                                text-xs
                                 font-bold
-                                uppercase
-                                tracking-[0.12em]
-                                text-yellow-400
+                                text-white
                               "
                             >
                               Bancolombia
@@ -1532,40 +1727,98 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         <div
                           className="
                             mt-3
-                            rounded-lg
+                            flex
+                            items-center
+                            gap-2
+                            rounded-xl
                             border
                             border-white/[0.06]
                             bg-black/20
-                            px-3
-                            py-2.5
-                            text-center
+                            px-4
+                            py-3
                           "
                         >
                           <p
                             className="
-                              break-all
+                              min-w-0
+                              flex-1
+                              text-center
                               font-mono
-                              text-sm
+                              text-lg
                               font-black
                               tracking-wider
                               text-white
-                              sm:text-base
                             "
                           >
                             91255816182
                           </p>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCopy(
+                                "91255816182"
+                              )
+                            }
+                            aria-label="Copiar número de cuenta Bancolombia"
+                            className="
+                              flex
+                              h-8
+                              w-8
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-lg
+                              border
+                              border-yellow-500/20
+                              bg-yellow-500/10
+                              text-yellow-400
+                              transition-colors
+                              hover:bg-yellow-500/20
+                            "
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
                         </div>
+
+                        <p
+                          className="
+                            mt-3
+                            text-center
+                            text-[11px]
+                            leading-5
+                            text-slate-400
+                          "
+                        >
+                          Realiza la transferencia y
+                          selecciona la cuenta de
+                          ahorros. Guarda el
+                          comprobante para enviarlo
+                          por WhatsApp.
+                        </p>
                       </div>
+                    )}
 
-                      {/* NEQUI */}
-
+                    {activeTab === "nequi" && (
                       <div
                         className="
                           rounded-xl
                           border
                           border-pink-500/20
                           bg-pink-500/[0.05]
-                          p-3.5
+                          p-4
                         "
                       >
                         <div
@@ -1578,8 +1831,8 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                           <div
                             className="
                               flex
-                              h-9
-                              w-9
+                              h-10
+                              w-10
                               shrink-0
                               items-center
                               justify-center
@@ -1593,14 +1846,12 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                             📱
                           </div>
 
-                          <div className="min-w-0">
+                          <div>
                             <p
                               className="
-                                text-[9px]
+                                text-xs
                                 font-bold
-                                uppercase
-                                tracking-[0.12em]
-                                text-pink-400
+                                text-white
                               "
                             >
                               Nequi
@@ -1621,77 +1872,88 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         <div
                           className="
                             mt-3
-                            rounded-lg
+                            flex
+                            items-center
+                            gap-2
+                            rounded-xl
                             border
                             border-white/[0.06]
                             bg-black/20
-                            px-3
-                            py-2.5
-                            text-center
+                            px-4
+                            py-3
                           "
                         >
                           <p
                             className="
-                              break-all
+                              min-w-0
+                              flex-1
+                              text-center
                               font-mono
-                              text-sm
+                              text-lg
                               font-black
                               tracking-wider
                               text-white
-                              sm:text-base
                             "
                           >
                             302 563 6290
                           </p>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCopy(
+                                "3025636290"
+                              )
+                            }
+                            aria-label="Copiar número Nequi"
+                            className="
+                              flex
+                              h-8
+                              w-8
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-lg
+                              border
+                              border-pink-500/20
+                              bg-pink-500/10
+                              text-pink-400
+                              transition-colors
+                              hover:bg-pink-500/20
+                            "
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
                         </div>
+
+                        <p
+                          className="
+                            mt-3
+                            text-center
+                            text-[11px]
+                            leading-5
+                            text-slate-400
+                          "
+                        >
+                          Envía el valor al número
+                          Nequi y guarda el
+                          comprobante para enviarlo
+                          por WhatsApp.
+                        </p>
                       </div>
-                    </div>
-
-                    {/* AVISO */}
-
-                    <div
-                      className="
-                        flex
-                        items-start
-                        gap-2.5
-                        rounded-xl
-                        border
-                        border-violet-500/15
-                        bg-violet-500/[0.05]
-                        px-3.5
-                        py-3
-                      "
-                    >
-                      <span className="mt-0.5 shrink-0 text-sm">
-                        💡
-                      </span>
-
-                      <p
-                        className="
-                          text-[10.5px]
-                          leading-[1.5]
-                          text-slate-400
-                        "
-                      >
-                        Puedes pagar mediante{" "}
-                        <span className="font-semibold text-yellow-300">
-                          Bancolombia
-                        </span>
-                        ,{" "}
-                        <span className="font-semibold text-pink-300">
-                          Nequi
-                        </span>{" "}
-                        o escaneando el código
-                        QR de{" "}
-                        <span className="font-semibold text-white">
-                          Bre-B
-                        </span>
-                        . Después de realizar
-                        el pago, envía el
-                        comprobante por
-                        WhatsApp.
-                      </p>
-                    </div>
+                    )}
                   </div>
 
                   {/* AVISO */}
@@ -1720,87 +1982,15 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         text-slate-400
                       "
                     >
-                      Después de realizar el
-                      pago, envía el comprobante
-                      por WhatsApp para que
-                      podamos verificarlo y
-                      confirmar definitivamente
-                      tu número.
+                      Después de realizar el pago,
+                      envía el comprobante por
+                      WhatsApp para que podamos
+                      verificarlo y confirmar
+                      definitivamente tu número.
                     </p>
                   </div>
                 </>
               )}
-
-              {/* DATOS */}
-
-              <div
-                className="
-                  rounded-xl
-                  border
-                  border-white/[0.06]
-                  bg-black/20
-                  p-3
-                "
-              >
-                <div
-                  className="
-                    flex
-                    items-center
-                    justify-between
-                    gap-3
-                  "
-                >
-                  <div>
-                    <p
-                      className="
-                        text-[9px]
-                        font-semibold
-                        uppercase
-                        tracking-[0.1em]
-                        text-slate-600
-                      "
-                    >
-                      Comprador
-                    </p>
-
-                    <p
-                      className="
-                        mt-0.5
-                        text-xs
-                        font-medium
-                        text-slate-300
-                      "
-                    >
-                      {name}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p
-                      className="
-                        text-[9px]
-                        font-semibold
-                        uppercase
-                        tracking-[0.1em]
-                        text-slate-600
-                      "
-                    >
-                      Teléfono
-                    </p>
-
-                    <p
-                      className="
-                        mt-0.5
-                        text-xs
-                        font-medium
-                        text-slate-300
-                      "
-                    >
-                      {phone}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </>
           ) : (
             <>
@@ -2015,11 +2205,20 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     disabled={loading}
                     placeholder="Ej. Juan Pérez"
                     value={name}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const clean =
+                        e.target.value.trim();
                       setName(
                         e.target.value
-                      )
-                    }
+                      );
+                      setNameError(
+                        !clean
+                          ? "Ingresa tu nombre completo"
+                          : clean.length < 3
+                            ? "El nombre debe tener al menos 3 caracteres"
+                            : null
+                      );
+                    }}
                     onKeyDown={(e) => {
                       if (
                         e.key === "Enter"
@@ -2027,11 +2226,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         handleSubmit();
                       }
                     }}
-                    className="
+                    className={`
                       w-full
                       rounded-lg
                       border
-                      border-white/[0.08]
                       bg-slate-950/70
                       px-3
                       py-2.5
@@ -2041,13 +2239,59 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       outline-none
                       transition-colors
                       hover:border-white/[0.14]
-                      focus:border-violet-500/60
                       focus:ring-2
-                      focus:ring-violet-500/10
                       disabled:cursor-not-allowed
                       disabled:opacity-50
-                    "
+                      ${
+                        nameError
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-white/[0.08] focus:border-violet-500/60 focus:ring-violet-500/10"
+                      }
+                    `}
+                    aria-invalid={!!nameError}
+                    aria-describedby={
+                      nameError
+                        ? "reservation-name-error"
+                        : undefined
+                    }
                   />
+
+                  {nameError && (
+                    <p
+                      id="reservation-name-error"
+                      role="alert"
+                      className="
+                        mt-1.5
+                        flex
+                        items-start
+                        gap-1.5
+                        text-[11px]
+                        font-medium
+                        leading-4
+                        text-red-400
+                      "
+                    >
+                      <svg
+                        className="
+                          mt-0.5
+                          h-3.5
+                          w-3.5
+                          shrink-0
+                        "
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {nameError}
+                    </p>
+                  )}
                 </div>
 
                 {/* TELÉFONO */}
@@ -2074,11 +2318,20 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                     disabled={loading}
                     placeholder="Ej. 300 123 4567"
                     value={phone}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const clean =
+                        e.target.value.trim();
                       setPhone(
                         e.target.value
-                      )
-                    }
+                      );
+                      setPhoneError(
+                        !clean
+                          ? "Ingresa tu número de teléfono"
+                          : clean.length < 7
+                            ? "Ingresa un teléfono válido"
+                            : null
+                      );
+                    }}
                     onKeyDown={(e) => {
                       if (
                         e.key === "Enter"
@@ -2086,11 +2339,10 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                         handleSubmit();
                       }
                     }}
-                    className="
+                    className={`
                       w-full
                       rounded-lg
                       border
-                      border-white/[0.08]
                       bg-slate-950/70
                       px-3
                       py-2.5
@@ -2100,25 +2352,73 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
                       outline-none
                       transition-colors
                       hover:border-white/[0.14]
-                      focus:border-violet-500/60
                       focus:ring-2
-                      focus:ring-violet-500/10
                       disabled:cursor-not-allowed
                       disabled:opacity-50
-                    "
+                      ${
+                        phoneError
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-white/[0.08] focus:border-violet-500/60 focus:ring-violet-500/10"
+                      }
+                    `}
+                    aria-invalid={!!phoneError}
+                    aria-describedby={
+                      phoneError
+                        ? "reservation-phone-error"
+                        : undefined
+                    }
                   />
 
-                  <p
-                    className="
-                      mt-1.5
-                      text-[10px]
-                      leading-4
-                      text-slate-600
-                    "
-                  >
-                    Usaremos este número para
-                    confirmar tu reserva.
-                  </p>
+                  {phoneError && (
+                    <p
+                      id="reservation-phone-error"
+                      role="alert"
+                      className="
+                        mt-1.5
+                        flex
+                        items-start
+                        gap-1.5
+                        text-[11px]
+                        font-medium
+                        leading-4
+                        text-red-400
+                      "
+                    >
+                      <svg
+                        className="
+                          mt-0.5
+                          h-3.5
+                          w-3.5
+                          shrink-0
+                        "
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {phoneError}
+                    </p>
+                  )}
+
+                  {!phoneError && (
+                    <p
+                      className="
+                        mt-1.5
+                        text-[10px]
+                        leading-4
+                        text-slate-600
+                      "
+                    >
+                      Usaremos este número para
+                      confirmar tu reserva.
+                    </p>
+                  )}
                 </div>
               </div>
             </>
@@ -2336,5 +2636,101 @@ Adjunto en este chat el comprobante de pago para que puedan verificarlo y confir
         </div>
       </div>
     </div>
+
+    {qrOpen && (
+      <div
+        className="
+          fixed inset-0 z-[60]
+          flex items-center justify-center
+          bg-black/80
+          p-4
+          backdrop-blur-sm
+          animate-in
+          fade-in
+          duration-200
+        "
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) {
+            setQrOpen(false);
+          }
+        }}
+      >
+        <div
+          className="
+            relative
+            animate-in
+            zoom-in-95
+            duration-200
+          "
+        >
+          <button
+            type="button"
+            onClick={() => setQrOpen(false)}
+            aria-label="Cerrar código QR"
+            className="
+              absolute
+              -right-3
+              -top-3
+              z-10
+              flex
+              h-9
+              w-9
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-white/10
+              bg-[#0b0e1a]
+              text-slate-400
+              shadow-lg
+              transition-colors
+              hover:bg-white/10
+              hover:text-white
+            "
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          <div
+            className="
+              overflow-hidden
+              rounded-3xl
+              border
+              border-white/15
+              bg-white
+              p-4
+              shadow-2xl
+              shadow-black/60
+            "
+          >
+            <img
+              src="/images/qr-breb1.png"
+              alt="Código QR Bre-B ampliado"
+              className="
+                h-80
+                w-80
+                max-w-full
+                object-contain
+                sm:h-[26rem]
+                sm:w-[26rem]
+              "
+            />
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -14,8 +14,12 @@ import {
   RaffleNumber,
 } from "@/lib/types";
 
-import NumbersTable from "@/components/admin/NumbersTable";
-import SearchBar from "@/components/admin/SearchBar";
+import NumbersTable, {
+  NumbersTableFilter,
+} from "@/components/admin/NumbersTable";
+
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /**
  * Página de gestión de números (`/admin/numeros`).
@@ -30,8 +34,16 @@ import SearchBar from "@/components/admin/SearchBar";
 export default function AdminNumerosPage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [numbers, setNumbers] = useState<RaffleNumber[]>([]);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+
+  /*
+   * Filtro activo (lo gestiona NumbersTable y se refleja aquí
+   * para poder exportar según el filtro).
+   */
+
+  const [filter, setFilter] = useState<
+    NumbersTableFilter | null
+  >(null);
 
   /*
    * Cargar rifa activa
@@ -49,10 +61,8 @@ export default function AdminNumerosPage() {
         const d = snap.docs[0];
 
         if (d) {
-          setRaffle({
-            id: d.id,
-            ...(d.data() as any),
-          });
+          const data = d.data() as Omit<Raffle, "id">;
+          setRaffle({ id: d.id, ...data });
         } else {
           setRaffle(null);
         }
@@ -77,10 +87,7 @@ export default function AdminNumerosPage() {
    */
 
   useEffect(() => {
-    if (!raffle) {
-      setNumbers([]);
-      return;
-    }
+    if (!raffle) return;
 
     const unsubscribe = onSnapshot(
       collection(
@@ -91,10 +98,13 @@ export default function AdminNumerosPage() {
       ),
       (snap) => {
         setNumbers(
-          snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as any),
-          }))
+          snap.docs.map(
+            (d) =>
+              ({
+                id: d.id,
+                ...(d.data() as Omit<RaffleNumber, "id">),
+              } as RaffleNumber)
+          )
         );
       },
       (error) => {
@@ -109,22 +119,133 @@ export default function AdminNumerosPage() {
   }, [raffle]);
 
   /*
-   * Filtrar búsqueda
+   * Filtrar según el filtro activo (para exportar y contar).
    */
 
   const filtered = numbers.filter((n) => {
-    if (!search) return true;
+    const status = filter?.status ?? "all";
 
-    const text = search.toLowerCase();
+    if (status !== "all" && n.status !== status) {
+      return false;
+    }
+
+    const q = filter?.search?.trim().toLowerCase() ?? "";
+
+    if (!q) return true;
 
     return (
-      n.buyerName
-        ?.toLowerCase()
-        .includes(text) ||
-      n.buyerPhone?.includes(search) ||
-      n.number?.includes(search)
+      String(n.number)
+        .toLowerCase()
+        .includes(q) ||
+      (n.buyerName ?? "")
+        .toLowerCase()
+        .includes(q) ||
+      (n.buyerPhone ?? "")
+        .toLowerCase()
+        .includes(q)
     );
   });
+
+  /*
+   * Exportación CSV / PDF (según el filtro activo).
+   */
+
+  const statusLabel = (s: RaffleNumber["status"]) =>
+    s === "available"
+      ? "Disponible"
+      : s === "reserved"
+        ? "Reservado"
+        : "Vendido";
+
+  function exportCsv() {
+    const header = [
+      "Número",
+      "Estado",
+      "Comprador",
+      "Teléfono",
+    ];
+
+    const rows = filtered.map((n) => [
+      n.number,
+      statusLabel(n.status),
+      n.buyerName ?? "",
+      n.buyerPhone ?? "",
+    ]);
+
+    const escape = (v: string) => {
+      if (/[",\n]/.test(v)) {
+        return `"${v.replace(/"/g, '""')}"`;
+      }
+      return v;
+    };
+
+    const csv = [header, ...rows]
+      .map((row) => row.map(escape).join(","))
+      .join("\r\n");
+
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `participantes-${raffle?.name ?? "rifa"}-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportPdf() {
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "a4",
+    });
+
+    const title = raffle?.name ?? "Participantes";
+    const subtitle = `Rifa: ${title} — ${
+      filtered.length
+    } participante${filtered.length === 1 ? "" : "s"}`;
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(subtitle, 40, 40);
+
+    autoTable(doc, {
+      startY: 56,
+      head: [
+        ["Número", "Estado", "Comprador", "Teléfono"],
+      ],
+      body: filtered.map((n) => [
+        n.number,
+        statusLabel(n.status),
+        n.buyerName ?? "",
+        n.buyerPhone ?? "",
+      ]),
+      theme: "striped",
+      headStyles: {
+        fillColor: [91, 33, 182],
+        fontSize: 10,
+        fontStyle: "bold",
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 6,
+      },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 90 },
+        2: { cellWidth: "auto" },
+        3: { cellWidth: 120 },
+      },
+    });
+
+    doc.save(
+      `participantes-${raffle?.name ?? "rifa"}-${Date.now()}.pdf`
+    );
+  }
 
   /*
    * Cargando
@@ -199,17 +320,13 @@ export default function AdminNumerosPage() {
   return (
     <div className="space-y-6">
 
-      {/* ENCABEZADO */}
-
-     
-
       {/* TABLA */}
 
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-2xl">
 
         <div className="border-b border-white/10 px-6 py-4">
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
 
             <div>
 
@@ -226,6 +343,56 @@ export default function AdminNumerosPage() {
 
             </div>
 
+            <div className="flex items-center gap-2">
+
+              <button
+                type="button"
+                onClick={exportCsv}
+                disabled={filtered.length === 0}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.07] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"
+                  />
+                </svg>
+                CSV
+              </button>
+
+              <button
+                type="button"
+                onClick={exportPdf}
+                disabled={filtered.length === 0}
+                className="inline-flex items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3.5 py-2 text-xs font-semibold text-violet-200 transition hover:bg-violet-500/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2zM12 3v6h6"
+                  />
+                </svg>
+                PDF
+              </button>
+
+            </div>
+
           </div>
 
         </div>
@@ -234,7 +401,8 @@ export default function AdminNumerosPage() {
 
           <NumbersTable
             raffleId={raffle.id}
-            numbers={filtered}
+            numbers={numbers}
+            onFilterChange={setFilter}
           />
 
         </div>

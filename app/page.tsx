@@ -20,6 +20,7 @@ import Footer from "@/components/Footer";
 import PrizeCard from "@/components/PrizeCard";
 import NumberGrid from "@/components/NumberGrid";
 import ReservationModal from "@/components/ReservationModal";
+import ReservationBanner from "@/components/ReservationBanner";
 
 /**
  * Página principal pública de la aplicación.
@@ -152,26 +153,39 @@ export default function HomePage() {
       return;
     }
 
-    const expiredIds = numbers
-      .filter((n) => isReservationExpired(n))
-      .map((n) => n.id);
+    // Liberar cualquier reserva vencida. Se delega al servidor, que
+    // valida (transaccional) que cada numero este reservado y haya
+    // expirado realmente antes de liberarlo.
+    const releaseExpired = () => {
+      const expiredIds = numbers
+        .filter((n) => isReservationExpired(n))
+        .map((n) => n.id);
 
-    if (expiredIds.length === 0) {
-      return;
-    }
+      if (expiredIds.length === 0) {
+        return;
+      }
 
-    // Se delega al servidor, que valida (transaccional) que cada uno
-    // de estos números esté reservado y realmente haya expirado antes
-    // de liberarlo.
-    releaseExpiredReservations({
-      raffleId: raffle.id,
-      numberIds: expiredIds,
-    }).catch((error) => {
-      console.error(
-        "Error liberando reservas expiradas:",
-        error
-      );
-    });
+      releaseExpiredReservations({
+        raffleId: raffle.id,
+        numberIds: expiredIds,
+      }).catch((error) => {
+        console.error(
+          "Error liberando reservas expiradas:",
+          error
+        );
+      });
+    };
+
+    // Liberar al cargar y cuando cambian los numeros.
+    releaseExpired();
+
+    // Tambien liberar cuando el contador de cualquier reserva llega a 0,
+    // aunque no haya habido cambios en Firestore. Asi el numero vuelve a
+    // estar disponible automaticamente, sin que el admin tenga que
+    // liberarlo a mano.
+    const interval = setInterval(releaseExpired, 1000);
+
+    return () => clearInterval(interval);
   }, [raffle?.id, numbers]);
 
   /* ================================================================
@@ -636,6 +650,18 @@ export default function HomePage() {
         />
       )}
 
+      {/* ============================================================
+          BANNER DE RESERVA ACTIVA
+      ============================================================ */}
+
+      {raffle && (
+        <ReservationBanner
+          numbers={numbers}
+          raffle={raffle}
+          onOpenNumber={setSelected}
+        />
+      )}
+
     </main>
   );
 }
@@ -850,8 +876,28 @@ function formatDrawDate(drawDate: unknown): string {
     ) {
       date = (drawDate as { toDate: () => Date }).toDate();
     } else {
-      const parsed = new Date(String(drawDate));
-      date = parsed;
+      const str = String(drawDate);
+
+      /*
+       * Si es una fecha pura "YYYY-MM-DD" (sin hora), la descomponemos
+       * y construimos una fecha LOCAL (new Date(year, month, day)) en vez
+       * de "YYYY-MM-DD" que JavaScript interpreta como medianoche UTC.
+       *
+       * De lo contrario, al formatear en America/Bogota (UTC-5), un
+       * "2026-09-26" se mostraría como 25 de septiembre.
+       */
+
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+
+      if (m) {
+        date = new Date(
+          Number(m[1]),
+          Number(m[2]) - 1,
+          Number(m[3])
+        );
+      } else {
+        date = new Date(str);
+      }
     }
 
     if (Number.isNaN(date.getTime())) {

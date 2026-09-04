@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "react-hot-toast";
+import OnlineStatusIndicator from "@/components/OnlineStatusIndicator";
 import "./globals.css";
 
 /**
@@ -32,7 +34,28 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="pb-24 lg:pb-0">{children}</body>
+      <body className="pb-24 lg:pb-0">
+        {children}
+        <OnlineStatusIndicator />
+        <Toaster
+          position="top-center"
+          gutter={19}
+          toastOptions={{
+            style: {
+              
+              background: "#0b0e1a",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "14px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
+              padding: "36px 40px",
+              fontSize: "16px",
+              maxWidth: "420px",
+              marginTop: "25000px",
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

@@ -263,25 +263,30 @@ export async function releaseExpiredReservations(input: {
   const adminDb = getAdminDb();
 
   await adminDb.runTransaction(async (tx) => {
+    const entries: {
+      ref: FirebaseFirestore.DocumentReference;
+      data: ReservationData;
+    }[] = [];
+
     for (const numberId of uniqueIds) {
-      const numberRef = adminDb.doc(
+      const ref = adminDb.doc(
         `raffles/${input.raffleId}/numbers/${numberId}`
       );
+      const snap = await tx.get(ref);
 
-      const snap = await tx.get(numberRef);
-
-      if (!snap.exists) {
-        continue;
+      if (snap.exists) {
+        entries.push({
+          ref,
+          data: snap.data() as ReservationData,
+        });
       }
+    }
 
-      const data = snap.data() as ReservationData;
-
-      if (!isReservedAndExpired(data)) {
-        continue;
+    for (const { ref, data } of entries) {
+      if (isReservedAndExpired(data)) {
+        tx.update(ref, clearReservation());
+        released += 1;
       }
-
-      tx.update(numberRef, clearReservation());
-      released += 1;
     }
   });
 
