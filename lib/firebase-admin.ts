@@ -62,18 +62,31 @@ export function getAdminDb() {
   if (cachedDb) return cachedDb;
 
   const existing = getApps().find((app) => app.name === ADMIN_APP_NAME);
-  const app =
-    existing ??
-    initializeApp(
-      {
-        credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID!,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-          privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)!,
-        }),
-      },
-      ADMIN_APP_NAME
+  if (existing) {
+    cachedDb = getFirestore(existing);
+    return cachedDb;
+  }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      "Faltan variables de entorno de Firebase Admin: FIREBASE_PROJECT_ID, " +
+        "FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY. En .env.local " +
+        "el valor de FIREBASE_PRIVATE_KEY está vacío: copia el campo " +
+        "private_key de firebase-admin-key.json (sin comillas). En Vercel: " +
+        "Settings → Environment Variables."
     );
+  }
+
+  const app = initializeApp(
+    {
+      credential: cert({ projectId, clientEmail, privateKey }),
+    },
+    ADMIN_APP_NAME
+  );
 
   cachedDb = getFirestore(app);
   return cachedDb;
