@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
-import OnlineStatusIndicator from "@/components/OnlineStatusIndicator";
 import "./globals.css";
 
 /**
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="pb-24 lg:pb-0">
         {children}
-        <OnlineStatusIndicator />
         <Toaster
           position="top-center"
           gutter={19}
@@ -51,7 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               padding: "36px 40px",
               fontSize: "16px",
               maxWidth: "420px",
-              marginTop: "25000px",
+              marginTop: "250px",
             },
           }}
         />
