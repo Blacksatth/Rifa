@@ -18,6 +18,23 @@ type Props = {
   numbers: RaffleNumber[];
 };
 
+/**
+ * Tabla de gestión de números para el admin.
+ *
+ * Componente completo de CRUD para números de la rifa (~1600 líneas).
+ * Funcionalidades:
+ * - Buscador por nombre, teléfono o número
+ * - Filtros por estado (Todos, Disponibles, Reservados, Vendidos)
+ * - Modales de venta, liberación, y edición de datos del comprador
+ * - Layout responsive: tabla en desktop, tarjetas en mobile
+ * - Badges de estado con colores diferenciados
+ * - Pills de estadísticas en la barra de filtros
+ * - Notificaciones toast personalizadas
+ * - Iconos SVG inline (sin dependencia externa)
+ *
+ * @see components/admin/SearchBar.tsx para el componente de búsqueda
+ */
+
 type Status = "available" | "reserved" | "sold";
 
 const STATUS_CONFIG: Record<

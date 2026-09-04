@@ -4,8 +4,18 @@ import { useMemo, useState } from "react";
 import { RaffleNumber } from "@/lib/types";
 import NumberCell from "./NumberCell";
 
+/**
+ * Filtros disponibles para la grilla de números.
+ * - "all": Muestra todos los números
+ * - "available": Solo números disponibles para reserva
+ * - "reserved": Solo números reservados (con timer activo)
+ * - "sold": Solo números vendidos y confirmados
+ */
 type StatusFilter = "all" | "available" | "reserved" | "sold";
 
+/**
+ * Configuración de los filtros de estado con etiquetas y colores.
+ */
 const FILTERS: {
   value: StatusFilter;
   label: string;
@@ -17,6 +27,19 @@ const FILTERS: {
   { value: "sold", label: "Vendidos", dotClass: "bg-red-400" },
 ];
 
+/**
+ * Grilla interactiva de números de la rifa.
+ *
+ * Muestra todos los números disponibles, reservados y vendidos en una
+ * cuadrícula responsive. Incluye:
+ * - Buscador por número (solo dígitos)
+ * - Filtros por estado (Todos, Disponibles, Reservados, Vendidos)
+ * - Contadores por cada estado
+ * - Renderiza NumberCell para cada número
+ *
+ * @param numbers - Lista de números de la rifa
+ * @param onSelect - Callback cuando se selecciona un número
+ */
 export default function NumberGrid({
   numbers,
   onSelect,

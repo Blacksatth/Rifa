@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+/**
+ * Props del formulario de campos de la rifa.
+ * Todos los campos son controlados (state lifted up al padre RaffleForm).
+ */
 interface RaffleFormFieldsProps {
   name: string;
   setName: (v: string) => void;
@@ -44,6 +48,25 @@ interface RaffleFormFieldsProps {
   isEditing?: boolean;
 }
 
+/**
+ * Campos del formulario de creación/edición de rifa.
+ *
+ * Renderiza todos los inputs necesarios:
+ * - Nombre de la rifa
+ * - Nombre del premio
+ * - Cantidad de números (deshabilitado al editar)
+ * - Precio por número
+ * - Fecha y hora del sorteo
+ * - Método del sorteo
+ * - Descripción
+ * - WhatsApp de contacto
+ * - Subida de imagen del premio
+ *
+ * Incluye un buffer de 500ms para inputs numéricos, evitando
+ * que cada tecla dispare un re-render inmediato (previene flickering).
+ *
+ * @param isEditing - Si es true, la cantidad de números no se puede cambiar
+ */
 export default function RaffleFormFields({
   name,
   setName,

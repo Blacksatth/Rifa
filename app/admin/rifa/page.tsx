@@ -12,6 +12,15 @@ import { db } from "@/lib/firebase";
 import { Raffle } from "@/lib/types";
 import RaffleForm from "@/components/admin/rifa/RaffleForm";
 
+/**
+ * Página de creación/edición de rifa (`/admin/rifa`).
+ *
+ * Carga la rifa activa y renderiza el RaffleForm.
+ * Si hay una rifa activa, se muestra en modo edición.
+ * Si no hay, se muestra en modo creación.
+ *
+ * @see components/admin/rifa/RaffleForm.tsx
+ */
 export default function AdminRifaPage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [loading, setLoading] = useState(true);

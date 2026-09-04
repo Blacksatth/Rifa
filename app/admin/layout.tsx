@@ -9,6 +9,24 @@ import { useRouter, usePathname } from "next/navigation";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
 
+/**
+ * Layout del panel de administración.
+ *
+ * Actúa como **guard de autenticación y autorización** para todas
+ * las rutas `/admin/*` excepto `/admin/login`.
+ *
+ * Flujo de verificación:
+ * 1. Si la ruta es `/admin/login`, no verifica nada (permite acceso)
+ * 2. Escucha `onAuthStateChanged` de Firebase Auth
+ * 3. Si no hay usuario, redirige a `/admin/login`
+ * 4. Si hay usuario, verifica que exista un documento en `admins/{uid}`
+ * 5. Si el documento no existe, redirige a `/admin/login`
+ * 6. Si existe, renderiza el layout con sidebar + header + contenido
+ *
+ * Muestra una pantalla de carga mientras verifica la autorización.
+ *
+ * @see docs/decisions/006-admin-authentication-authorization.md
+ */
 export default function AdminLayout({
   children,
 }: {

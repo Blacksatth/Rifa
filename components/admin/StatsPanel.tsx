@@ -7,12 +7,34 @@ import { Raffle, RaffleNumber } from "@/lib/types";
 import toast from "react-hot-toast";
 
 interface StatsPanelProps {
+  /** Datos de la rifa activa */
   raffle: Raffle;
+  /** Lista completa de números de la rifa */
   numbers: RaffleNumber[];
 }
 
+/**
+ * Duración de reserva en milisegundos (30 min).
+ * Se usa para calcular el porcentaje de tiempo restante en la UI.
+ */
 const RESERVATION_TIME_MS = 30 * 60 * 1000;
 
+/**
+ * Panel de estadísticas del admin.
+ *
+ * Muestra información en tiempo real de la rifa:
+ * - Tarjetas de estadísticas: Vendidos, Reservados, Disponibles, Recaudado (COP)
+ * - Lista de reservas activas con countdown individual por comprador
+ * - Barra de progreso general de ventas
+ *
+ * Características:
+ * - Actualiza la UI cada segundo para mostrar countdown en tiempo real
+ * - El admin puede liberar reservas individuales con confirmación
+ * - Muestra estado urgente (rojo) cuando quedan < 5 minutos
+ * - Muestra estado expirado (rojo) cuando el tiempo llegó a 0
+ *
+ * @see docs/decisions/003-reservation-timer.md
+ */
 export default function StatsPanel({ raffle, numbers }: StatsPanelProps) {
   const [now, setNow] = useState(Date.now());
   const [releasingId, setReleasingId] = useState<string | null>(null);

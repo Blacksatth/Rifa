@@ -9,6 +9,20 @@ const display = Space_Grotesk({
   variable: "--font-ticket",
 });
 
+/**
+ * Tarjeta de visualización del premio de la rifa.
+ *
+ * Muestra la imagen del premio (o un placeholder), el nombre de la rifa,
+ * el nombre del premio y el precio por número formateado en COP.
+ *
+ * Diseño visual: simula un boleto de rifa con una línea de perforación
+ * separando la imagen (superior) del talón con información (inferior).
+ *
+ * @example
+ * ```tsx
+ * <PrizeCard raffle={activeRaffle} />
+ * ```
+ */
 export default function PrizeCard({ raffle }: { raffle: Raffle }) {
   const formattedPrice = formatPriceCOP(raffle.price);
 
@@ -103,6 +117,9 @@ export default function PrizeCard({ raffle }: { raffle: Raffle }) {
 /**
  * Formatea un valor como pesos colombianos: separador de miles con punto,
  * sin decimales, con símbolo de $. Ejemplo: 10000 -> "$10.000"
+ *
+ * @param price - Precio en COP (number o string)
+ * @returns String formateado como moneda colombiana
  */
 function formatPriceCOP(price: Raffle["price"]) {
   const value = typeof price === "string" ? Number(price) : price;

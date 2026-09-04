@@ -16,7 +16,14 @@ import { Raffle } from "@/lib/types";
 import RaffleFormFields from "./RaffleFormFields";
 import RafflePreview from "./RafflePreview";
 
+/**
+ * Límite máximo de números por rifa.
+ * Firestore tiene un límite de 500 writes por batch, y con 10,000 números
+ * se necesitan 20 batches. Más de 10,000 haría la creación demasiado lenta.
+ */
 const MAX_NUMBERS = 10000;
+
+/** Límite de operaciones por Firestore write batch */
 const BATCH_LIMIT = 500;
 
 // ==========================================
@@ -31,6 +38,31 @@ function formatCOP(value: number) {
   });
 }
 
+/**
+ * Formulario de creación/edición/eliminación de rifas.
+ *
+ * Maneja el ciclo de vida completo de una rifa:
+ *
+ * **Crear:**
+ * 1. Valida los campos del formulario
+ * 2. Sube la imagen del premio a Cloudinary (si se seleccionó una)
+ * 3. Crea el documento de la rifa en Firestore
+ * 4. Genera los documentos de números en batches de 500 con progreso en tiempo real
+ *
+ * **Editar:**
+ * 1. Actualiza los campos de la rifa
+ * 2. Si cambió la imagen, sube la nueva a Cloudinary
+ * 3. Si cambió el conteo de números o dígitos, sincroniza la subcolección
+ *    (crea los que faltan, elimina los que sobran)
+ *
+ * **Eliminar:**
+ * 1. Pide confirmación al admin
+ * 2. Elimina todos los números en batches de 500
+ * 3. Elimina el documento de la rifa
+ *
+ * @param existing - Rifa existente para editar, o null para crear una nueva
+ * @see docs/decisions/007-batch-operations-raffle-creation.md
+ */
 export default function RaffleForm({ existing }: { existing: Raffle | null }) {
   // ==========================================
   // ESTADOS

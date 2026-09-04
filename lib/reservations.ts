@@ -1,5 +1,28 @@
+/**
+ * Utilidades de reserva para el cliente.
+ *
+ * Funciones helper que se ejecutan en el navegador para:
+ * - Parsear fechas de expiración de Firestore
+ * - Verificar si una reserva ha expirado
+ * - Identificar al visitante actual (localStorage)
+ * - Determinar si una reserva pertenece al visitante actual
+ *
+ * @see docs/decisions/002-anonymous-visitor-identification.md
+ * @see docs/decisions/003-reservation-timer.md
+ */
+
 import { RaffleNumber } from "@/lib/types";
 
+/**
+ * Normaliza el valor de expiración de una reserva a milisegundos.
+ *
+ * Firestore puede devolver fechas en múltiples formatos dependiendo
+ * del SDK utilizado (cliente vs admin) y la versión del SDK.
+ * Esta función los maneja todos de forma unificada.
+ *
+ * @param value - Valor del campo `reservationExpiresAt` de Firestore
+ * @returns Milisegundos desde epoch, o null si no se puede parsear
+ */
 export function getExpirationTimeMs(
   value: unknown
 ): number | null {
@@ -57,6 +80,13 @@ export function getExpirationTimeMs(
   return null;
 }
 
+/**
+ * Verifica si la reserva de un número ya expiró.
+ *
+ * @param data - Datos del número de la rifa
+ * @param now - Timestamp actual en ms (default: Date.now())
+ * @returns true si el número está reservado y su tiempo de expiración ya pasó
+ */
 export function isReservationExpired(
   data: RaffleNumber,
   now: number = Date.now()
@@ -77,9 +107,22 @@ export function isReservationExpired(
   return expiration <= now;
 }
 
+/**
+ * Clave de localStorage donde se almacena el ID del visitante.
+ * @see docs/decisions/002-anonymous-visitor-identification.md
+ */
 const VISITOR_ID_KEY =
   "raffle_visitor_id";
 
+/**
+ * Obiene o genera el ID único del visitante actual.
+ *
+ * El ID se almacena en localStorage para persistir entre sesiones.
+ * Se genera con `crypto.randomUUID()` cuando está disponible,
+ * con un fallback a `Date.now() + Math.random()` para compatibilidad.
+ *
+ * @returns El ID del visitante, o string vacío si no está en el navegador
+ */
 export function getVisitorId(): string {
   if (
     typeof window === "undefined"
@@ -129,6 +172,17 @@ export function getVisitorId(): string {
   }
 }
 
+/**
+ * Verifica si una reserva pertenece al visitante actual.
+ *
+ * Compara el `buyerVisitorId` del número con el `visitorId` proporcionado.
+ * Se usa en NumberCell para decidir si mostrar el número con estilo
+ * "Tu reserva" y permitir abrir el modal.
+ *
+ * @param data - Datos del número de la rifa
+ * @param visitorId - ID del visitante actual (de localStorage)
+ * @returns true si la reserva pertenece al visitante
+ */
 export function isReservationMine(
   data: RaffleNumber,
   visitorId: string | null

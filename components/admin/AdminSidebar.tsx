@@ -5,6 +5,21 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
+/**
+ * Sidebar de navegación del panel de administración.
+ *
+ * Incluye dos versiones:
+ * - **Desktop**: Sidebar fijo de 288px a la izquierda con logo, navegación
+ *   y botón de logout
+ * - **Mobile**: Barra de navegación fija en la parte inferior con tabs
+ *
+ * Navegación:
+ * - `/admin` → Estadísticas (dashboard)
+ * - `/admin/rifa` → Crear/editar rifa
+ * - `/admin/numeros` → Gestionar números vendidos
+ *
+ * Resalta la ruta activa con estilo violeta.
+ */
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();

@@ -6,9 +6,22 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 type HeaderProps = {
+    /** Si hay una rifa activa, muestra el indicador "Rifa en curso" */
     raffle?: boolean;
 };
 
+/**
+ * Header público de la aplicación.
+ *
+ * Barra fija en la parte superior con:
+ * - Logo "RifaYA" con enlace al inicio
+ * - Indicador "Rifa en curso" (cuando hay rifa activa)
+ * - Botón de admin/logout según estado de autenticación
+ * - Efecto de scroll: borde inferior y backdrop blur al hacer scroll
+ *
+ * Usa `onAuthStateChanged` de Firebase Auth para detectar si hay sesión.
+ * Cambia el estilo del header al hacer scroll (más compacto, más opaco).
+ */
 export default function Header({ raffle = false }: HeaderProps) {
     const [scrolled, setScrolled] = useState(false);
     const [user, setUser] = useState<User | null>(null);

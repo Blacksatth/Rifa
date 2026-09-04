@@ -17,6 +17,16 @@ import {
 import NumbersTable from "@/components/admin/NumbersTable";
 import SearchBar from "@/components/admin/SearchBar";
 
+/**
+ * Página de gestión de números (`/admin/numeros`).
+ *
+ * Muestra la tabla completa de números de la rifa activa con:
+ * - Buscador por nombre, teléfono o número
+ * - Filtros por estado
+ * - Acciones CRUD: marcar como vendido, liberar, editar datos
+ *
+ * Usa `onSnapshot` para actualizaciones en tiempo real.
+ */
 export default function AdminNumerosPage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [numbers, setNumbers] = useState<RaffleNumber[]>([]);

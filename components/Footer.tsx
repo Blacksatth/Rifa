@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+/**
+ * Footer público de la aplicación.
+ *
+ * Incluye:
+ * - Logo y descripción de RifaYA
+ * - Enlaces de navegación (Inicio, Panel de administración)
+ * - Redes sociales (TikTok, Facebook)
+ * - Botón "Volver arriba" (aparece al hacer scroll > 400px)
+ * - Copyright dinámico con el año actual
+ */
 export default function Footer() {
   const year = new Date().getFullYear();
   const [showTop, setShowTop] = useState(false);

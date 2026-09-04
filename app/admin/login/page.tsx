@@ -10,6 +10,18 @@ import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 
+/**
+ * Página de login del administrador (`/admin/login`).
+ *
+ * Ofrece dos métodos de autenticación:
+ * 1. Email + contraseña (signInWithEmailAndPassword)
+ * 2. Google Sign-In (signInWithPopup)
+ *
+ * Después del login exitoso, redirige a `/admin`.
+ * Muestra errores en un banner estilizado.
+ *
+ * Diseño: tarjeta glassmorphism centrada con fondo decorativo.
+ */
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

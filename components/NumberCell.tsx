@@ -8,6 +8,10 @@ import {
   isReservationMine,
 } from "@/lib/reservations";
 
+/**
+ * Estados posibles de un número de la rifa.
+ * Cada estado tiene estilos visuales y comportamiento de interacción diferente.
+ */
 type NumberStatus =
   | "available"
   | "reserved"
@@ -18,6 +22,10 @@ interface NumberCellProps {
   onClick: () => void;
 }
 
+/**
+ * Estilos visuales para cada estado del número.
+ * Incluye clases de Tailwind para: contenedor, número, dot indicador, y etiqueta.
+ */
 const STATUS_STYLES: Record<
   NumberStatus,
   {
@@ -65,6 +73,22 @@ const STATUS_STYLES: Record<
   },
 };
 
+/**
+ * Celda individual de un número de la rifa.
+ *
+ * Renderiza un botón con el número, su estado (disponible/reservado/vendido)
+ * y un dot indicador de color. El comportamiento depende del estado:
+ *
+ * - **Disponible**: Cualquier visitante puede hacer clic para reservar
+ * - **Reservado**: Solo el visitante que hizo la reserva puede hacer clic
+ *   (verificado con buyerVisitorId vs localStorage visitorId)
+ * - **Vendido**: No interactuable
+ *
+ * Si la reserva pertenece al visitante actual, se muestra con estilo
+ * especial azul ("Tu reserva") con glow y dot pulsante.
+ *
+ * @see docs/decisions/002-anonymous-visitor-identification.md
+ */
 export default function NumberCell({
   data,
   onClick,

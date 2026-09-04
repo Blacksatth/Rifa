@@ -21,6 +21,27 @@ import PrizeCard from "@/components/PrizeCard";
 import NumberGrid from "@/components/NumberGrid";
 import ReservationModal from "@/components/ReservationModal";
 
+/**
+ * Página principal pública de la aplicación.
+ *
+ * Muestra la rifa activa y permite a los visitantes:
+ * 1. Ver la información del premio y la rifa
+ * 2. Navegar la grilla de números
+ * 3. Seleccionar un número para reservarlo
+ *
+ * Flujo de datos:
+ * - Consulta Firestore en tiempo real para la rifa activa (`active == true`)
+ * - Carga los números de la subcolección en tiempo real
+ * - Al cargar, limpia las reservas expiradas vía Server Actions
+ * - Al seleccionar un número, abre el ReservationModal
+ *
+ * Sub-componentes inline:
+ * - Background: gradientes decorativos de fondo
+ * - InfoCard: tarjetas con información del sorteo (fecha, hora, método)
+ * - LoadingScreen: pantalla de carga animada
+ * - EmptyRaffle: mensaje cuando no hay rifa activa
+ * - formatReadMore: utilidad para formatear fechas legibles
+ */
 export default function HomePage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [numbers, setNumbers] = useState<RaffleNumber[]>([]);

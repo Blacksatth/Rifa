@@ -2,6 +2,15 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+/**
+ * Layout raíz de la aplicación.
+ *
+ * Carga las fuentes Geist Sans y Geist Mono, configura los metadatos
+ * base de la aplicación, y envuelve todas las páginas.
+ *
+ * Las páginas admin (`app/admin/layout.tsx`) tienen su propio layout
+ * con sidebar y header que se carga encima de este.
+ */
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

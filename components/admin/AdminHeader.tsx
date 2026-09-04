@@ -4,6 +4,17 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
+/**
+ * Header superior del panel de administración.
+ *
+ * Barra sticky que muestra:
+ * - Título y descripción de la sección actual (basado en la ruta)
+ * - Indicador "Panel activo" con dot verde animado
+ * - Enlace a la página principal pública
+ * - Icono de administrador
+ *
+ * Determina la sección actual mediante `usePathname()` de Next.js.
+ */
 export default function AdminHeader() {
   const pathname = usePathname();
 

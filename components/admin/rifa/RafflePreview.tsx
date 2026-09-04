@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Props del preview en tiempo real de la rifa.
+ */
 interface RafflePreviewProps {
   name: string;
   prizeName: string;
@@ -15,6 +18,21 @@ interface RafflePreviewProps {
   formatCOP: (value: number) => string;
 }
 
+/**
+ * Preview en tiempo real de la rifa que se está configurando.
+ *
+ * Tarjeta sticky en el sidebar que muestra cómo se verá la rifa
+ * con los datos actuales del formulario:
+ * - Imagen del premio (o placeholder)
+ * - Nombre de la rifa
+ * - Nombre del premio
+ * - Descripción
+ * - Información del sorteo (fecha, hora, método)
+ * - Total de números y valor total recaudable
+ * - Contacto WhatsApp
+ *
+ * Se actualiza instantáneamente al modificar cualquier campo del formulario.
+ */
 export default function RafflePreview({
   name,
   prizeName,

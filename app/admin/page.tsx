@@ -12,6 +12,17 @@ import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
 import StatsPanel from "@/components/admin/StatsPanel";
 
+/**
+ * Dashboard principal del panel de administración (`/admin`).
+ *
+ * Muestra un resumen en tiempo real de la rifa activa:
+ * - Header con nombre de la rifa, premio, y contadores
+ * - Barra de progreso general
+ * - Panel de estadísticas detalladas (StatsPanel)
+ *
+ * Usa `onSnapshot` de Firestore para actualizaciones en tiempo real
+ * de la rifa y sus números.
+ */
 export default function AdminPage() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [numbers, setNumbers] = useState<RaffleNumber[]>([]);
