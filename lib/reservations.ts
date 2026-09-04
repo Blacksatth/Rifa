@@ -1,9 +1,3 @@
-import {
-  doc,
-  getDoc,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { RaffleNumber } from "@/lib/types";
 
 export function getExpirationTimeMs(
@@ -81,60 +75,6 @@ export function isReservationExpired(
   }
 
   return expiration <= now;
-}
-
-export async function releaseExpiredReservation(
-  raffleId: string,
-  number: RaffleNumber
-): Promise<boolean> {
-  if (!isReservationExpired(number)) {
-    return false;
-  }
-
-  try {
-    const numberRef = doc(
-      db,
-      "raffles",
-      raffleId,
-      "numbers",
-      number.id
-    );
-
-    const snapshot = await getDoc(numberRef);
-
-    if (!snapshot.exists()) {
-      return false;
-    }
-
-    const data = snapshot.data();
-
-    if (
-      data.status !== "reserved" ||
-      !isReservationExpired(
-        data as RaffleNumber
-      )
-    ) {
-      return false;
-    }
-
-    await updateDoc(numberRef, {
-      status: "available",
-      buyerName: null,
-      buyerPhone: null,
-      buyerVisitorId: null,
-      reservedAt: null,
-      reservationExpiresAt: null,
-    });
-
-    return true;
-  } catch (error) {
-    console.error(
-      "Error liberando reserva expirada:",
-      error
-    );
-
-    return false;
-  }
 }
 
 const VISITOR_ID_KEY =

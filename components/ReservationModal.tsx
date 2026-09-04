@@ -3,19 +3,67 @@
 import { useEffect, useState } from "react";
 import {
   doc,
-  updateDoc,
-  serverTimestamp,
   getDoc,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
+import { getVisitorId } from "@/lib/reservations";
 import {
-  getVisitorId,
-  getExpirationTimeMs,
-  releaseExpiredReservation,
-} from "@/lib/reservations";
+  reserveNumber,
+  releaseReservation as releaseReservationAction,
+} from "@/lib/actions";
 import toast from "react-hot-toast";
+
+const getExpirationTimeMs = (
+  value: unknown
+): number | null => {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    const obj = value as {
+      toMillis?: unknown;
+      toDate?: unknown;
+    };
+
+    if (
+      typeof obj.toMillis === "function"
+    ) {
+      const ms = (
+        obj as { toMillis: () => unknown }
+      ).toMillis();
+      return typeof ms === "number" ? ms : null;
+    }
+
+    if (
+      typeof obj.toDate === "function"
+    ) {
+      const d = (
+        obj as { toDate: () => unknown }
+      ).toDate();
+      return d instanceof Date &&
+        !Number.isNaN(d.getTime())
+        ? d.getTime()
+        : null;
+    }
+  }
+
+  return null;
+};
 
 // ============================================================
 // WHATSAPP DEL ADMINISTRADOR
@@ -246,20 +294,22 @@ export default function ReservationModal({
           // ==================================================
           // LIBERAR LA RESERVA EXPIRADA
           //
-          // Solo libera si la reserva sigue estando expirada
-          // (devolviendo la consulta al estado actual).
+          // Se delega al servidor, que valida que la reserva
+          // realmente haya expirado antes de liberarla.
           // ==================================================
 
-          await releaseExpiredReservation(
-            raffleId,
-            {
-              ...number,
-              status: "reserved",
-              buyerVisitorId: visitorId,
-              reservationExpiresAt:
-                data.reservationExpiresAt,
-            }
-          );
+          try {
+            await releaseReservationAction({
+              raffleId,
+              numberId: number.id,
+              visitorId,
+            });
+          } catch (error) {
+            console.error(
+              "Error liberando reserva expirada:",
+              error
+            );
+          }
 
           if (mounted) {
             setReserved(false);
@@ -344,68 +394,19 @@ export default function ReservationModal({
         }
 
         try {
-          const numberRef =
-            doc(
-              db,
-              "raffles",
-              raffleId,
-              "numbers",
-              number.id
-            );
-
           // ======================================================
-          // CONSULTAR ESTADO ACTUAL
-          // ======================================================
-
-          const snapshot =
-            await getDoc(numberRef);
-
-          if (!snapshot.exists()) {
-            return;
-          }
-
-          const data =
-            snapshot.data();
-
-          // ======================================================
-          // SEGURIDAD
+          // LIBERAR EN EL SERVIDOR
           //
-          // SOLO LIBERAR SI:
-          //
-          // 1. Sigue reservado
-          // 2. Pertenece al mismo navegador
+          // El servidor solo libera si la reserva realmente expiró,
+          // por lo que no es posible liberar la reserva activa de
+          // otra persona manipulando el cliente.
           // ======================================================
 
-          if (
-            data.status !==
-              "reserved" ||
-            data.buyerVisitorId !==
-              visitorId
-          ) {
-            return;
-          }
-
-          // ======================================================
-          // LIBERAR
-          // ======================================================
-
-          await updateDoc(
-            numberRef,
-            {
-              status: "available",
-
-              buyerName: null,
-
-              buyerPhone: null,
-
-              buyerVisitorId: null,
-
-              reservedAt: null,
-
-              reservationExpiresAt:
-                null,
-            }
-          );
+          await releaseReservationAction({
+            raffleId,
+            numberId: number.id,
+            visitorId,
+          });
 
           // ======================================================
           // ACTUALIZAR UI
@@ -426,7 +427,7 @@ export default function ReservationModal({
             error
           );
 
-          // Permitimos reintentar si Firebase falló.
+          // Permitimos reintentar si el servidor falló.
           released = false;
         }
       };
@@ -552,103 +553,23 @@ export default function ReservationModal({
 
     try {
       // ==========================================================
-      // REFERENCIA
+      // GUARDAR RESERVA EN EL SERVIDOR
+      //
+      // El servidor valida la disponibilidad y el estado del
+      // número (no reservado, no vendido) de forma transaccional,
+      // e impide marcar números como vendidos desde el cliente.
       // ==========================================================
 
-      const numberRef =
-        doc(
-          db,
-          "raffles",
-          raffleId,
-          "numbers",
-          number.id
-        );
-
-      // ==========================================================
-      // COMPROBAR ESTADO ACTUAL
-      // ==========================================================
-
-      const currentSnapshot =
-        await getDoc(numberRef);
-
-      if (
-        !currentSnapshot.exists()
-      ) {
-        toast.error(
-          "El número ya no existe."
-        );
-
-        return;
-      }
-
-      const currentData =
-        currentSnapshot.data();
-
-      // ==========================================================
-      // YA ESTÁ RESERVADO
-      // ==========================================================
-
-      if (
-        currentData.status ===
-        "reserved"
-      ) {
-        toast.error(
-          "Este número ya está reservado."
-        );
-
-        return;
-      }
-
-      // ==========================================================
-      // YA ESTÁ VENDIDO
-      // ==========================================================
-
-      if (
-        currentData.status ===
-        "sold"
-      ) {
-        toast.error(
-          "Este número ya fue vendido."
-        );
-
-        return;
-      }
-
-      // ==========================================================
-      // EXPIRACIÓN
-      // ==========================================================
+      const result = await reserveNumber({
+        raffleId,
+        numberId: number.id,
+        visitorId,
+        name: cleanName,
+        phone: cleanPhone,
+      });
 
       const reservationExpiresAt =
-        Date.now() +
-        RESERVATION_TIME_MS;
-
-      // ==========================================================
-      // GUARDAR RESERVA
-      // ==========================================================
-
-      await updateDoc(
-        numberRef,
-        {
-          status: "reserved",
-
-          buyerName:
-            cleanName,
-
-          buyerPhone:
-            cleanPhone,
-
-          buyerVisitorId:
-            visitorId,
-
-          reservedAt:
-            serverTimestamp(),
-
-          reservationExpiresAt:
-            new Date(
-              reservationExpiresAt
-            ),
-        }
-      );
+        result.reservationExpiresAt;
 
       // ==========================================================
       // ACTUALIZAR UI

@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// ============================================================================
+// REGLAS DE SEGURIDAD DE FIRESTORE
+// ----------------------------------------------------------------------------
+// Proyecto: RIFA
+//
+// IMPORTANTE: Estas reglas BLOQUEAN los escritos de VISITANTES desde el
+// cliente. Las reservas/liberaciones de visitantes ya se ejecutan en el
+// servidor mediante Server Actions con firebase-admin (lib/actions.ts), que
+// ignora estas reglas y valida la lógica de negocio. El panel de administración
+// sigue escribiendo desde el cliente con el SDK, por lo que esas escrituras
+// se permiten únicamente a administradores autenticados (isAdmin()).
+//
+// Modelo de datos:
+//   auth.uid  -> UID de Firebase Authentication (solo admins tienen cuenta)
+//   admins/{uid}                 -> documento que acredita a un administrador
+//   raffles/{raffleId}           -> datos públicos de la rifa
+//   raffles/{raffleId}/numbers/* -> números/vendedores (datos sensibles)
+//
+// LÓGICA:
+//   - Todo el mundo puede LEER las rifas (necesario para la página pública).
+//   - El detalle de compradores (nombres/teléfonos) dentro de numbers NO debe
+//     poder leerse libremente; requiere ser admin.
+//   - Las ESCRITURAS de visitantes se hacen SOLO desde el servidor backend
+//     (con las credenciales de servicio, que ignora estas reglas). Las
+//     escrituras del cliente requieren ser admin.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // HELPERS
+    // ------------------------------------------------------------------------
+
+    // ¿El usuario autenticado actual es administrador?
+    // Se comprueba que exista un documento en /admins/{uid}.
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ------------------------------------------------------------------------
+    // /admins/{uid}
+    // ------------------------------------------------------------------------
+    // Colección PARAMÉTRICA: un usuario solo puede leer su PROPIO documento.
+    // Nadie puede crearlos/escribirlos desde el cliente (se gestionan por
+    // consola o mediante el servidor con las credenciales de servicio).
+
+    match /admins/{uid} {
+      allow read: if isAdmin() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // /raffles/{raffleId}
+    // ------------------------------------------------------------------------
+    // La rifa es de lectura pública (la ve la página de compra).
+    // Solo los administradores pueden crearla, modificarla o eliminarla.
+
+    match /raffles/{raffleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      // ----------------------------------------------------------------------
+      // /raffles/{raffleId}/numbers/{numberId}
+      // ----------------------------------------------------------------------
+      // Subcolección de números. Contiene datos de compradores (nombre,
+      // teléfono) y el estado de venta.
+      //
+      // LECTURA: un visitante NO autenticado solo puede leer los campos que
+      // necesita para la grilla (id, number, status). Para los datos
+      // personales del comprador se exige ser admin.
+      //
+      // ESCRITURA: bloqueada desde el cliente. Todas las transiciones de
+      // reserva / liberación / venta deben hacerse en el servidor con
+      // firebase-admin (ignora estas reglas), donde sí se valida la lógica
+      // de negocio (disponibilidad, expiración, dueño de la reserva, pago).
+
+      match /numbers/{numberId} {
+        // Lectura pública: necesaria para dibujar la grilla de números.
+        // OJO: los clientes NO autenticados pueden leer la subcolección
+        // completa, lo que hoy expone nombres y teléfonos de compradores.
+        //
+        // TODO(backend): restringir la lectura de datos personales a admins.
+        // Un enfoque es separar la info pública de la privada; por ejemplo
+        // guardar los datos del comprador en una subcolección aparte
+        // .../numbers/{numberId}/buyer y permitir SU lectura solo a admins:
+        //
+        //   match /numbers/{numberId}/buyer/{b} {
+        //     allow read: if isAdmin();
+        //     allow write: if false;
+        //   }
+        //
+        // Mientras no se migre, exportar los datos personales a un doc aparte
+        // y eliminar buyerName/buyerPhone del doc público del número.
+
+        allow read: if true;
+
+        // TODO(backend): implementar la reserva/venta/liberación como Server
+        // Action con firebase-admin y permitir aquí únicamente:
+        //   allow create, update, delete: if isAdmin();
+        // (firebase-admin opera fuera de estas reglas y aplica la lógica).
+        //
+        // Las reservas/liberaciones de VISITANTES ya se ejecutan en el servidor
+        // (Server Actions con firebase-admin, ver lib/actions.ts). Las
+        // escrituras del panel de ADMIN (venta manual, liberar, crear/editar
+        // números) siguen en el cliente con el SDK, por eso se permiten SOLO a
+        // administradores autenticados.
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // CUALQUIER OTRA COLECCIÓN: DENEGADA POR DEFECTO
+    // ------------------------------------------------------------------------
+    // Firestore deniega por defecto todo lo que no se mencione, pero dejamos
+    // explícita esta regla general como red de seguridad.
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

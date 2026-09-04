@@ -12,10 +12,8 @@ import {
 
 import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
-import {
-  isReservationExpired,
-  releaseExpiredReservation,
-} from "@/lib/reservations";
+import { isReservationExpired } from "@/lib/reservations";
+import { releaseExpiredReservations } from "@/lib/actions";
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -133,30 +131,26 @@ export default function HomePage() {
       return;
     }
 
-    const expired = numbers.filter(
-      (n) => isReservationExpired(n)
-    );
+    const expiredIds = numbers
+      .filter((n) => isReservationExpired(n))
+      .map((n) => n.id);
 
-    if (expired.length === 0) {
+    if (expiredIds.length === 0) {
       return;
     }
 
-    let cancelled = false;
-
-    (async () => {
-      for (const n of expired) {
-        if (cancelled) break;
-
-        await releaseExpiredReservation(
-          raffle.id,
-          n
-        );
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    // Se delega al servidor, que valida (transaccional) que cada uno
+    // de estos números esté reservado y realmente haya expirado antes
+    // de liberarlo.
+    releaseExpiredReservations({
+      raffleId: raffle.id,
+      numberIds: expiredIds,
+    }).catch((error) => {
+      console.error(
+        "Error liberando reservas expiradas:",
+        error
+      );
+    });
   }, [raffle?.id, numbers]);
 
   /* ================================================================
