@@ -6,12 +6,15 @@ import {
   updateDoc,
   serverTimestamp,
   getDoc,
-  Timestamp,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
-import { getVisitorId } from "@/lib/reservations";
+import {
+  getVisitorId,
+  getExpirationTimeMs,
+  releaseExpiredReservation,
+} from "@/lib/reservations";
 import toast from "react-hot-toast";
 
 // ============================================================
@@ -208,43 +211,10 @@ export default function ReservationModal({
         // OBTENER FECHA DE EXPIRACIÓN
         // ======================================================
 
-        let expirationTime: number | null = null;
-
-        const storedExpiration =
-          data.reservationExpiresAt;
-
-        if (
-          storedExpiration instanceof Timestamp
-        ) {
-          expirationTime =
-            storedExpiration.toMillis();
-        } else if (
-          storedExpiration instanceof Date
-        ) {
-          expirationTime =
-            storedExpiration.getTime();
-        } else if (
-          storedExpiration &&
-          typeof storedExpiration.toMillis ===
-            "function"
-        ) {
-          expirationTime =
-            storedExpiration.toMillis();
-        } else if (
-          typeof storedExpiration === "string"
-        ) {
-          const parsed = new Date(
-            storedExpiration
-          ).getTime();
-
-          if (!Number.isNaN(parsed)) {
-            expirationTime = parsed;
-          }
-        } else if (
-          typeof storedExpiration === "number"
-        ) {
-          expirationTime = storedExpiration;
-        }
+        const expirationTime =
+          getExpirationTimeMs(
+            data.reservationExpiresAt
+          );
 
         // ======================================================
         // NO EXISTE FECHA DE EXPIRACIÓN
@@ -273,52 +243,23 @@ export default function ReservationModal({
         // ======================================================
 
         if (remaining <= 0) {
-          try {
-            // Volvemos a consultar para evitar liberar
-            // una reserva que haya cambiado mientras tanto.
+          // ==================================================
+          // LIBERAR LA RESERVA EXPIRADA
+          //
+          // Solo libera si la reserva sigue estando expirada
+          // (devolviendo la consulta al estado actual).
+          // ==================================================
 
-            const latestSnapshot =
-              await getDoc(numberRef);
-
-            if (latestSnapshot.exists()) {
-              const latestData =
-                latestSnapshot.data();
-
-              // ==================================================
-              // SOLO LIBERAR SI SIGUE SIENDO LA MISMA RESERVA
-              // ==================================================
-
-              if (
-                latestData.status ===
-                  "reserved" &&
-                latestData.buyerVisitorId ===
-                  visitorId
-              ) {
-                await updateDoc(
-                  numberRef,
-                  {
-                    status: "available",
-
-                    buyerName: null,
-
-                    buyerPhone: null,
-
-                    buyerVisitorId: null,
-
-                    reservedAt: null,
-
-                    reservationExpiresAt:
-                      null,
-                  }
-                );
-              }
+          await releaseExpiredReservation(
+            raffleId,
+            {
+              ...number,
+              status: "reserved",
+              buyerVisitorId: visitorId,
+              reservationExpiresAt:
+                data.reservationExpiresAt,
             }
-          } catch (error) {
-            console.error(
-              "Error liberando reserva expirada:",
-              error
-            );
-          }
+          );
 
           if (mounted) {
             setReserved(false);

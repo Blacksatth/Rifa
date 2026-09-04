@@ -12,6 +12,10 @@ import {
 
 import { db } from "@/lib/firebase";
 import { Raffle, RaffleNumber } from "@/lib/types";
+import {
+  isReservationExpired,
+  releaseExpiredReservation,
+} from "@/lib/reservations";
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -115,6 +119,45 @@ export default function HomePage() {
 
     return () => unsubscribe();
   }, [raffle?.id]);
+
+  /* ================================================================
+     VALIDAR RESERVAS EXPIRADAS
+     ================================================================
+     Cuando el contador llega a 0 (o cuando alguien recarga la
+     página), liberamos cualquier reserva vencida para que el
+     número vuelva a estar disponible automáticamente.
+  ================================================================= */
+
+  useEffect(() => {
+    if (!raffle?.id) {
+      return;
+    }
+
+    const expired = numbers.filter(
+      (n) => isReservationExpired(n)
+    );
+
+    if (expired.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      for (const n of expired) {
+        if (cancelled) break;
+
+        await releaseExpiredReservation(
+          raffle.id,
+          n
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [raffle?.id, numbers]);
 
   /* ================================================================
      ESTADÍSTICAS
