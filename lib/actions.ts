@@ -1,9 +1,24 @@
 "use server";
 
-import { adminDb } from "@/lib/firebase-admin";
+/**
+ * Server Actions para operaciones de reserva de números.
+ *
+ * Estas funciones se ejecutan EXCLUSIVAMENTE en el servidor de Next.js
+ * y usan firebase-admin, que ignora las reglas de Firestore. Aquí es
+ * donde se valida la lógica de negocio y se garantiza la integridad
+ * de datos mediante transacciones atómicas.
+ *
+ * @see docs/decisions/001-server-side-reservation-logic.md
+ * @see firestore.rules para las reglas de seguridad del cliente
+ */
+
+import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
+/** Duración de la reserva en minutos (30 min) */
 const RESERVATION_TIME_MINUTES = 30;
+
+/** Duración de la reserva en milisegundos */
 const RESERVATION_TIME_MS =
   RESERVATION_TIME_MINUTES * 60 * 1000;
 
@@ -13,6 +28,19 @@ type ReservationData = {
   reservationExpiresAt?: unknown;
 };
 
+/**
+ * Normaliza el valor de expiración de una reserva a milisegundos.
+ *
+ * Firestore puede devolver fechas como: `Date`, `number` (timestamp),
+ * `string` (ISO), o objetos con `toMillis()` / `toDate()` (Timestamp).
+ * Esta función maneja todos los formatos posibles.
+ *
+ * Nota: Esta función está duplicada en lib/reservations.ts (cliente)
+ * porque las Server Actions no pueden importar módulos del cliente.
+ *
+ * @param value - El valor del campo `reservationExpiresAt` de Firestore
+ * @returns Milisegundos desde epoch, o null si no se puede parsear
+ */
 function getExpirationMs(
   value: unknown
 ): number | null {
@@ -54,6 +82,10 @@ function getExpirationMs(
   return null;
 }
 
+/**
+ * Verifica si un número está reservado y su reserva ya expiró.
+ * Se usa para decidir si se puede liberar un número.
+ */
 function isReservedAndExpired(
   data: ReservationData
 ): boolean {
@@ -72,6 +104,10 @@ function isReservedAndExpired(
   return expiration <= Date.now();
 }
 
+/**
+ * Retorna un objeto con todos los campos de reserva reseteados a null.
+ * Se usa al liberar un número reservado.
+ */
 function clearReservation() {
   return {
     status: "available",
@@ -116,6 +152,7 @@ export async function reserveNumber(input: {
     throw new Error("Ingresa un teléfono válido");
   }
 
+  const adminDb = getAdminDb();
   const numberRef = adminDb.doc(
     `raffles/${input.raffleId}/numbers/${input.numberId}`
   );
@@ -171,6 +208,7 @@ export async function releaseReservation(input: {
     throw new Error("Datos de la liberación inválidos.");
   }
 
+  const adminDb = getAdminDb();
   const numberRef = adminDb.doc(
     `raffles/${input.raffleId}/numbers/${input.numberId}`
   );
@@ -221,6 +259,8 @@ export async function releaseExpiredReservations(input: {
   const uniqueIds = [...new Set(input.numberIds)];
 
   let released = 0;
+
+  const adminDb = getAdminDb();
 
   await adminDb.runTransaction(async (tx) => {
     for (const numberId of uniqueIds) {

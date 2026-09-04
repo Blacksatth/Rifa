@@ -598,8 +598,16 @@ export default function ReservationModal({
         error
       );
 
+      // Mostrar el mensaje de error real devuelto por el servidor
+      // (ej: credenciales de firebase-admin, número ya reservado...)
+      const serverMessage =
+        error instanceof Error
+          ? error.message
+          : "";
+
       toast.error(
-        "No se pudo reservar el número. Intenta nuevamente."
+        serverMessage ||
+          "No se pudo reservar el número. Intenta nuevamente."
       );
     } finally {
       setLoading(false);
